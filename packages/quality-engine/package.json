@@ -1,0 +1,26 @@
+{
+  "name": "@threadflow-os/quality-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./deterministic": "./dist/deterministic.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/prompt-kit": "workspace:*",
+    "@threadflow-os/shared": "workspace:*",
+    "zod": "^4.1.5"
+  }
+}

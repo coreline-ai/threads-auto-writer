@@ -1,0 +1,32 @@
+{
+  "name": "@threadflow-os/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "prepare": "wxt prepare",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.85.5",
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/quality-engine": "workspace:*",
+    "@threadflow-os/shared": "workspace:*",
+    "@threadflow-os/threads-adapter": "workspace:*",
+    "dexie": "^4.2.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "fake-indexeddb": "^6.2.2",
+    "wxt": "^0.20.11"
+  }
+}

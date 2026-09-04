@@ -1,0 +1,44 @@
+{
+  "name": "threadflow-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Quality-first Threads writing companion powered by Codex App Server",
+  "type": "module",
+  "packageManager": "pnpm@11.13.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "dev:gateway": "pnpm --filter @threadflow-os/codex-gateway dev",
+    "start:developer": "node scripts/start-developer-mode.mjs",
+    "dev:scheduler": "pnpm --filter @threadflow-os/scheduler-server dev",
+    "dev:extension": "pnpm --filter @threadflow-os/extension dev",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "spike:codex": "node scripts/codex-app-server-spike.mjs",
+    "smoke:quality": "node scripts/live-quality-smoke.mjs",
+    "smoke:performance": "node scripts/performance-smoke.mjs",
+    "eval": "node scripts/run-golden-eval.mjs",
+    "package:companion": "node scripts/package-companion.mjs",
+    "package:extension": "pnpm --filter @threadflow-os/extension zip",
+    "rotate:scheduler-key": "node scripts/rotate-scheduler-key.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^24.3.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.34.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^3.2.4"
+  }
+}

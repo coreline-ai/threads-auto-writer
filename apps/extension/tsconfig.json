@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-types",
+    "tsBuildInfoFile": "dist-types/.tsbuildinfo",
+    "jsx": "react-jsx",
+    "types": ["chrome"]
+  },
+  "include": [
+    "entrypoints/**/*.ts",
+    "entrypoints/**/*.tsx",
+    "features/**/*.ts",
+    "features/**/*.tsx",
+    "lib/**/*.ts",
+    "storage/**/*.ts",
+    "wxt.config.ts"
+  ],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/quality-engine" },
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/threads-adapter" }
+  ]
+}

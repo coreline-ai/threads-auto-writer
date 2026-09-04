@@ -1,0 +1,27 @@
+services:
+  threadflow-scheduler:
+    build:
+      context: .
+      dockerfile: apps/scheduler-server/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SCHEDULER_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8788:8788"
+    volumes:
+      - threadflow-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8788/v1/health').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  threadflow-data:

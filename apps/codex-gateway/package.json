@@ -1,0 +1,26 @@
+{
+  "name": "@threadflow-os/codex-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@threadflow-os/codex-provider": "workspace:*",
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/prompt-kit": "workspace:*",
+    "@threadflow-os/quality-engine": "workspace:*",
+    "@threadflow-os/shared": "workspace:*",
+    "fastify": "^5.6.0"
+  }
+}

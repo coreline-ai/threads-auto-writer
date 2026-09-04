@@ -1,0 +1,24 @@
+{
+  "name": "@threadflow-os/codex-provider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/quality-engine": "workspace:*",
+    "@threadflow-os/shared": "workspace:*"
+  }
+}

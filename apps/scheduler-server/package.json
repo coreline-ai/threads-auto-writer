@@ -1,0 +1,21 @@
+{
+  "name": "@threadflow-os/scheduler-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/database": "workspace:*",
+    "@threadflow-os/shared": "workspace:*",
+    "@threadflow-os/threads-client": "workspace:*",
+    "fastify": "^5.6.0"
+  }
+}

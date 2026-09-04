@@ -1,0 +1,10 @@
+node_modules
+**/dist
+**/dist-types
+**/.output
+**/.wxt
+coverage
+artifacts
+release
+docs/generated
+pnpm-lock.yaml

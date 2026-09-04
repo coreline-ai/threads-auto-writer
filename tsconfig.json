@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/contracts" },
+    { "path": "packages/shared" },
+    { "path": "packages/prompt-kit" },
+    { "path": "packages/quality-engine" },
+    { "path": "packages/codex-provider" },
+    { "path": "packages/threads-adapter" },
+    { "path": "packages/database" },
+    { "path": "packages/threads-client" },
+    { "path": "apps/codex-gateway" },
+    { "path": "apps/scheduler-server" },
+    { "path": "apps/extension" }
+  ]
+}
