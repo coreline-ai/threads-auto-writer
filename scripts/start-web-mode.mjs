@@ -6,6 +6,7 @@ const root = process.cwd();
 const webOrigin = process.env.THREADFLOW_WEB_ORIGINS ?? "http://127.0.0.1:4173";
 const tsc = resolve(root, "node_modules/typescript/bin/tsc");
 const vite = resolve(root, "apps/web/node_modules/vite/bin/vite.js");
+const providerMode = process.env.THREADFLOW_CODEX_PROVIDER ?? "proxy";
 
 process.stdout.write("ThreadFlow 웹 실행에 필요한 공유 패키지를 확인합니다.\n");
 const build = spawnSync(
@@ -53,6 +54,9 @@ for (const child of children) {
 
 process.stdout.write(
   `\nThreadFlow 웹: ${webOrigin}\n` +
-    "설정에서 .threadflow/session-secret 파일의 키를 입력한 뒤 ChatGPT 구독으로 로그인하세요.\n" +
+    (providerMode === "proxy"
+      ? "Codex OAuth Provider Proxy가 실행 중이어야 하며 OAuth은 Proxy에서 관리합니다.\n"
+      : "Direct 개발 모드입니다. 설정에서 ChatGPT 구독 OAuth 로그인을 진행하세요.\n") +
+    "설정에서 .threadflow/session-secret 파일의 키 내용을 입력하세요.\n" +
     "종료: Ctrl+C\n\n",
 );

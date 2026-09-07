@@ -35,7 +35,7 @@ await writeFile(resolve(target, "threadflow-companion"), launcher, {
 await chmod(resolve(target, "threadflow-companion"), 0o755);
 await writeFile(
   resolve(target, "README.txt"),
-  "ThreadFlow OS Companion\n\n1. Install Node.js 22+ and Codex CLI.\n2. Run codex login and choose ChatGPT.\n3. Set THREADFLOW_EXTENSION_ORIGINS.\n4. Run ./threadflow-companion.\n5. Open .threadflow/session-secret and paste the file contents (not the path) into the Side Panel Companion key field.\n\nChrome Web Store submission and Apple notarization are not required for local developer-mode use.\n",
+  "ThreadFlow OS Companion\n\nDefault: Codex OAuth Provider Proxy\n1. Install Node.js 22+.\n2. Set THREADFLOW_CODEX_PROVIDER=proxy, THREADFLOW_CODEX_PROXY_BASE_URL, THREADFLOW_CODEX_PROXY_CALLER_ID, and THREADFLOW_CODEX_PROXY_SECRET_FILE (absolute path, mode 0600).\n3. Configure the Proxy service with CODEX_PROXY_REQUEST_MAX_BYTES=524288 and CODEX_TEXT_MAX_OUTPUT_CHARS=16000 for long Korean inputs.\n4. Set THREADFLOW_EXTENSION_ORIGINS.\n5. Run ./threadflow-companion.\n6. Open .threadflow/session-secret and paste the file contents (not the path) into the Side Panel Companion key field.\n\nDirect developer fallback only: set THREADFLOW_CODEX_PROVIDER=direct, install Codex CLI, and complete codex login.\nChrome Web Store submission and Apple notarization are not required for local developer-mode use.\n",
 );
 const archive = resolve(releaseRoot, "threadflow-companion-macos.tar.gz");
 const tar = spawnSync(

@@ -21,6 +21,8 @@ export const ApiErrorCodeSchema = z.enum([
   "RATE_LIMITED",
   "PROVIDER_UNAVAILABLE",
   "INVALID_OUTPUT",
+  "IDEMPOTENCY_CONFLICT",
+  "SENSITIVE_PROVIDER_OUTPUT",
   "CANCELED",
   "INTERNAL",
 ]);
@@ -188,6 +190,8 @@ export const AuthStatusSchema = z.object({
     })
     .nullable(),
   providerVersion: z.string().nullable(),
+  providerMode: z.enum(["proxy", "direct"]).optional(),
+  readinessReason: z.string().max(100).nullable().optional(),
 });
 export type AuthStatus = z.infer<typeof AuthStatusSchema>;
 

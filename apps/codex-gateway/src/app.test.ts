@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AuthStatus } from "@threadflow-os/contracts";
+import type { AuthStatus, GenerationRequest } from "@threadflow-os/contracts";
+import { generationRequestFingerprint } from "@threadflow-os/shared/fingerprint";
 import type { GenerationProviderSession } from "./generation-manager.js";
 import { buildGateway, type GatewayProvider } from "./app.js";
 
@@ -7,9 +8,56 @@ const origin = "chrome-extension://threadflow-test";
 const port = 8787;
 const headers = { host: `127.0.0.1:${port}`, origin };
 
+function generationPayload(
+  sourceId = "s",
+  purpose = "테스트",
+): GenerationRequest {
+  return {
+    source: {
+      id: sourceId,
+      text: sourceId === "s-cancel" ? "취소 테스트 참고 글" : "참고 글",
+      author: null,
+      url: null,
+      capturedAt: new Date().toISOString(),
+      captureMethod: "paste",
+      adapterVersion: "threads-web-v1",
+    },
+    persona: {
+      id: "p",
+      name: "p",
+      audience: "a",
+      voice: "v",
+      goals: [],
+      bannedPhrases: [],
+      preferredLength: { min: 20, max: 500 },
+      language: "ko-KR",
+    },
+    purpose,
+    mode: "new",
+    variationStrength: 0.8,
+    candidateCount: 3,
+    userEvidence: [],
+    affiliateDisclosure: null,
+  };
+}
+
+function generationHeaders(
+  authorized: Record<string, string>,
+  payload: GenerationRequest,
+  key = "threadflow-test-key-0001",
+) {
+  return {
+    ...authorized,
+    "idempotency-key": key,
+    "x-request-fingerprint": generationRequestFingerprint(payload),
+  };
+}
+
 class FakeProvider implements GatewayProvider {
   closed = false;
   authenticated = true;
+  generationSessions = 0;
+  sensitiveOutput = false;
   revisionPrompts: string[] = [];
   revisionResult: () => Promise<unknown> = async () => ({
     text: "수정된 최종 글입니다.",
@@ -41,6 +89,7 @@ class FakeProvider implements GatewayProvider {
     this.authenticated = false;
   }
   createGenerationProvider(): GenerationProviderSession {
+    this.generationSessions += 1;
     if (this.blockGeneration) {
       return {
         threadId: () => "thread-blocked",
@@ -61,7 +110,19 @@ class FakeProvider implements GatewayProvider {
         this.revisionPrompts.push(prompt);
         return this.revisionResult();
       },
-      generateJson: async ({ stage }) => {
+      generateJson: async ({ stage, onDelta }) => {
+        if (this.sensitiveOutput) {
+          const leaked = `Bearer ${"s".repeat(24)}`;
+          onDelta?.(leaked);
+          return {
+            hookPattern: leaked,
+            structure: [],
+            emotion: [],
+            ctaPattern: "질문",
+            claimRisks: [],
+            doNotReuse: [],
+          };
+        }
         if (stage === "ANALYZING")
           return {
             hookPattern: "질문",
@@ -206,41 +267,70 @@ describe("localhost gateway security", () => {
       authenticated: true,
       accountType: "chatgpt",
     });
+    const payload = generationPayload();
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/generations",
+          headers: authorized,
+          payload,
+        })
+      ).statusCode,
+    ).toBe(400);
+    const mismatched = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: {
+        ...authorized,
+        "idempotency-key": "threadflow-test-key-mismatch",
+        "x-request-fingerprint": "0".repeat(64),
+      },
+      payload,
+    });
+    expect(mismatched.statusCode).toBe(409);
     const created = await app.inject({
       method: "POST",
       url: "/v1/generations",
-      headers: authorized,
-      payload: {
-        source: {
-          id: "s",
-          text: "참고 글",
-          author: null,
-          url: null,
-          capturedAt: new Date().toISOString(),
-          captureMethod: "paste",
-          adapterVersion: "threads-web-v1",
-        },
-        persona: {
-          id: "p",
-          name: "p",
-          audience: "a",
-          voice: "v",
-          goals: [],
-          bannedPhrases: [],
-          preferredLength: { min: 20, max: 500 },
-          language: "ko-KR",
-        },
-        purpose: "테스트",
-        mode: "new",
-        variationStrength: 0.8,
-        candidateCount: 3,
-        userEvidence: [],
-        affiliateDisclosure: null,
-      },
+      headers: generationHeaders(authorized, payload),
+      payload,
     });
     expect(created.statusCode).toBe(202);
     const id = created.json<{ id: string }>().id;
     await new Promise((resolve) => setTimeout(resolve, 20));
+    const replay = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: generationHeaders(authorized, payload),
+      payload,
+    });
+    expect(replay.statusCode).toBe(202);
+    expect(replay.json<{ id: string }>().id).toBe(id);
+    expect(provider.generationSessions).toBe(1);
+    const conflictPayload = { ...payload, purpose: "다른 목적" };
+    const conflict = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: generationHeaders(authorized, conflictPayload),
+      payload: conflictPayload,
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json()).toMatchObject({
+      error: { code: "IDEMPOTENCY_CONFLICT" },
+    });
+    const regenerated = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: generationHeaders(
+        authorized,
+        payload,
+        "threadflow-test-key-regenerate",
+      ),
+      payload,
+    });
+    expect(regenerated.statusCode).toBe(202);
+    expect(regenerated.json<{ id: string }>().id).not.toBe(id);
+    expect(provider.generationSessions).toBe(2);
     const result = await app.inject({
       method: "GET",
       url: `/v1/generations/${id}`,
@@ -332,6 +422,19 @@ describe("localhost gateway security", () => {
         })
       ).statusCode,
     ).toBe(502);
+    const revisionSecret = `Bearer ${"r".repeat(24)}`;
+    provider.revisionResult = async () => ({ text: revisionSecret });
+    const blockedRevision = await app.inject({
+      method: "POST",
+      url: `/v1/generations/${id}/revisions`,
+      headers: authorized,
+      payload: previewInput,
+    });
+    expect(blockedRevision.statusCode).toBe(502);
+    expect(blockedRevision.json()).toMatchObject({
+      error: { code: "SENSITIVE_PROVIDER_OUTPUT" },
+    });
+    expect(blockedRevision.body).not.toContain(revisionSecret);
     provider.revisionResult = async () => ({ text: "수정된 최종 글입니다." });
     const revised = await app.inject({
       method: "POST",
@@ -350,34 +453,8 @@ describe("localhost gateway security", () => {
     const rejected = await app.inject({
       method: "POST",
       url: "/v1/generations",
-      headers: authorized,
-      payload: {
-        source: {
-          id: "s",
-          text: "참고 글",
-          author: null,
-          url: null,
-          capturedAt: new Date().toISOString(),
-          captureMethod: "paste",
-          adapterVersion: "threads-web-v1",
-        },
-        persona: {
-          id: "p",
-          name: "p",
-          audience: "a",
-          voice: "v",
-          goals: [],
-          bannedPhrases: [],
-          preferredLength: { min: 20, max: 500 },
-          language: "ko-KR",
-        },
-        purpose: "테스트",
-        mode: "new",
-        variationStrength: 0.8,
-        candidateCount: 3,
-        userEvidence: [],
-        affiliateDisclosure: null,
-      },
+      headers: generationHeaders(authorized, payload),
+      payload,
     });
     expect(rejected.statusCode).toBe(401);
     await app.close();
@@ -385,39 +462,25 @@ describe("localhost gateway security", () => {
 
   it("cancels an active generation without completing it", async () => {
     const { app, authorized } = await setup(true);
+    const payload = generationPayload("s-cancel", "취소");
     const created = await app.inject({
       method: "POST",
       url: "/v1/generations",
-      headers: authorized,
-      payload: {
-        source: {
-          id: "s-cancel",
-          text: "취소 테스트 참고 글",
-          author: null,
-          url: null,
-          capturedAt: new Date().toISOString(),
-          captureMethod: "paste",
-          adapterVersion: "threads-web-v1",
-        },
-        persona: {
-          id: "p",
-          name: "p",
-          audience: "a",
-          voice: "v",
-          goals: [],
-          bannedPhrases: [],
-          preferredLength: { min: 20, max: 500 },
-          language: "ko-KR",
-        },
-        purpose: "취소",
-        mode: "new",
-        variationStrength: 0.8,
-        candidateCount: 3,
-        userEvidence: [],
-        affiliateDisclosure: null,
-      },
+      headers: generationHeaders(authorized, payload),
+      payload,
     });
     const id = created.json<{ id: string }>().id;
+    const coalesced = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: generationHeaders(
+        authorized,
+        payload,
+        "threadflow-test-key-other-tab",
+      ),
+      payload,
+    });
+    expect(coalesced.json<{ id: string }>().id).toBe(id);
     expect(
       (
         await app.inject({
@@ -436,6 +499,42 @@ describe("localhost gateway security", () => {
         })
       ).json().state,
     ).toBe("CANCELED");
+    await app.close();
+  });
+
+  it("blocks sensitive provider output before raw deltas or results reach SSE", async () => {
+    const { app, authorized, provider } = await setup();
+    provider.sensitiveOutput = true;
+    const payload = generationPayload("s-sensitive", "보안 검사");
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      headers: generationHeaders(
+        authorized,
+        payload,
+        "threadflow-sensitive-output-key",
+      ),
+      payload,
+    });
+    const id = created.json<{ id: string }>().id;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const snapshot = await app.inject({
+      method: "GET",
+      url: `/v1/generations/${id}`,
+      headers: authorized,
+    });
+    expect(snapshot.json()).toMatchObject({
+      state: "FAILED",
+      error: { code: "SENSITIVE_PROVIDER_OUTPUT" },
+    });
+    const events = await app.inject({
+      method: "GET",
+      url: `/v1/generations/${id}/events`,
+      headers: authorized,
+    });
+    expect(events.body).not.toContain("Bearer");
+    expect(events.body).not.toContain('"type":"delta"');
+    expect(events.headers["access-control-allow-origin"]).toBe(origin);
     await app.close();
   });
 

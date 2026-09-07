@@ -74,6 +74,8 @@ export class CodexProviderAdapter {
           }
         : null,
       providerVersion: this.#providerVersion,
+      providerMode: "direct",
+      readinessReason: null,
     };
   }
 

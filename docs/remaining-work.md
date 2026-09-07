@@ -6,6 +6,8 @@
 
 기존 정확성·사용성 재검토의 수정과 에디토리얼 스튜디오 디자인 적용을 완료했다. 별도 검증 항목은 실제 Threads 계정, Meta 개발자 앱, HTTPS callback 또는 사람·설치 환경이 있어야 수행할 수 있는 외부 검증이다. 상세 근거는 [필수 기능 정확성·사용성 전문가 재검토](correctness-usability-audit.md)에 있다.
 
+Codex 생성 경로의 코드 작업도 완료했다. 전용 Proxy caller와 격리 Live Smoke는 통과했지만, 이 Mac의 공용 `4348` Proxy는 연결되지 않은 장치 watchdog이 약 30초마다 모든 Proxy를 재시작한다. 이 운영 설정을 분리하기 전에는 긴 실제 생성이 중간에 `PROVIDER_UNAVAILABLE`로 종료될 수 있다.
+
 ## 리디자인 후 확인한 주의점
 
 - 실제 생성에서 구조화 출력 검증 실패 1회를 관측했고 재시도는 성공했다. 실패 시 입력 보존·오류 표시를 검증했다. 원인과 재현율은 확정하지 않았으며 성공률 개선은 이번 디자인 적용 범위가 아니다.
@@ -42,6 +44,19 @@
 | P0       | hijacked SSE 응답의 웹 CORS 헤더 누락과 실브라우저 `Failed to fetch`  | 완료 |
 
 ## 실제 사용 전 필수 외부 Gate
+
+### Codex OAuth Provider Proxy
+
+| ID           | 필요한 입력·환경            | 수행 내용                                                           | 현재 상태        |
+| ------------ | --------------------------- | ------------------------------------------------------------------- | ---------------- |
+| EXT-PROXY-01 | 전용 caller ID/secret       | `threadflow` ACL 등록, `0600` secret 파일                           | 이 Mac 완료      |
+| EXT-PROXY-02 | Proxy 입력·출력 상한        | 요청 524288 bytes, 출력 16000 chars 설정                            | 이 Mac 완료      |
+| EXT-PROXY-03 | 안정적인 Proxy daemon       | 관련 없는 PD20 장애가 Codex Proxy를 재시작하지 않도록 watchdog 분리 | 사용자 승인 대기 |
+| EXT-PROXY-04 | 실 ChatGPT OAuth/Codex 구독 | 격리 Proxy에서 5단계 글 생성·후보 3개·최종 결과 확인                | 완료             |
+
+`EXT-PROXY-03`은 ThreadFlow 소스 결함이 아니라 외부 Proxy 운영 Gate다. POST 자동 재전송은 응답 유실 시 중복 LLM turn을 만들 수 있어 우회책으로 적용하지 않았다.
+
+### Threads 공식 API
 
 | ID     | 필요한 입력·환경      | 수행 내용                                     | 현재 상태 |
 | ------ | --------------------- | --------------------------------------------- | --------- |
@@ -93,8 +108,10 @@
 
 - TypeScript project reference typecheck: PASS
 - ESLint: PASS
-- Vitest: `125/125` PASS
+- Vitest: `141/141` PASS
 - localhost 웹 production build·실브라우저 QA: PASS
 - 웹 Origin Codex OAuth 상태·실제 Chromium 1턴 생성·승인·복구: PASS
 - WXT Chrome MV3 production build: PASS
-- Extension ZIP SHA-256: `3147f14befdce28c10fa60af375264a5d16ffbc826f0feeb51bf4ac21471f75e`
+- Codex OAuth Proxy 전용 caller 격리 5단계 Live Smoke: PASS
+- Extension ZIP SHA-256: `11fd04d74dda4711eb74f58466f54c29ba50d35d223816307ec0c580f732091b`
+- Companion tar.gz SHA-256: `6aed32f3ef9ad3831fc514261f0e0f8fa7e40911bc23b66199dbe39280c15f7c`

@@ -5,9 +5,15 @@ import {
   GenerationRequestSchema,
   SourceSnapshotSchema,
 } from "@threadflow-os/contracts";
+import {
+  assertApprovalSnapshot,
+  type ApprovalSnapshot,
+  type SelectedImageReference,
+} from "./manual-handoff.js";
 
 export type WorkspaceSnapshot = Omit<WorkspaceState, "id"> & {
-  image?: { name: string; size: number; altText: string } | null;
+  image?: SelectedImageReference | null;
+  approvalSnapshot?: ApprovalSnapshot | null;
 };
 export type WorkingDraft = {
   id: string;
@@ -81,8 +87,20 @@ export function validateWorkspace(value: unknown): WorkspaceSnapshot {
       !(
         typeof s.image.name === "string" &&
         typeof s.image.size === "number" &&
-        typeof s.image.altText === "string"
-      ))
+        typeof s.image.altText === "string" &&
+        (s.image.mimeType === undefined ||
+          typeof s.image.mimeType === "string") &&
+        (s.image.sha256 === undefined || typeof s.image.sha256 === "string")
+      )) ||
+    (s.approvalSnapshot != null &&
+      (() => {
+        try {
+          assertApprovalSnapshot(s.approvalSnapshot);
+          return false;
+        } catch {
+          return true;
+        }
+      })())
   )
     throw new Error(
       "저장된 작업 형식이 손상되었습니다. 설정에서 내보내기로 원본을 보관하세요.",
@@ -128,6 +146,7 @@ export function freshWorkspace(current: WorkspaceSnapshot): WorkspaceSnapshot {
     sourceUrl: "",
     evidence: "",
     image: null,
+    approvalSnapshot: null,
     activeRequest: null,
     selectedCandidateId: null,
     workflow: {

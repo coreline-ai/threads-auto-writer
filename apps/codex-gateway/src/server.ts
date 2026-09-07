@@ -1,8 +1,10 @@
 import { resolve } from "node:path";
 import {
   AppServerClient,
+  CodexOAuthProxyAdapter,
   CodexProviderAdapter,
   StdioAppServerTransport,
+  loadCodexOAuthProxyConfig,
 } from "@threadflow-os/codex-provider";
 import { loadOrCreateSecret } from "@threadflow-os/shared";
 import { buildGateway } from "./app.js";
@@ -25,19 +27,28 @@ const secretPath = resolve(
   process.env.THREADFLOW_SESSION_SECRET_FILE ?? ".threadflow/session-secret",
 );
 const bootstrapSecret = await loadOrCreateSecret(secretPath);
-const transport = new StdioAppServerTransport({
-  cwd: root,
-  ...(process.env.THREADFLOW_CODEX_BIN
-    ? { codexBin: process.env.THREADFLOW_CODEX_BIN }
-    : {}),
-});
-const client = new AppServerClient(transport);
-const provider = new CodexProviderAdapter(client, {
-  cwd: root,
-  ...(process.env.THREADFLOW_CODEX_MODEL
-    ? { model: process.env.THREADFLOW_CODEX_MODEL }
-    : {}),
-});
+const providerMode = process.env.THREADFLOW_CODEX_PROVIDER ?? "proxy";
+if (!new Set(["proxy", "direct"]).has(providerMode))
+  throw new Error("THREADFLOW_CODEX_PROVIDER must be proxy or direct");
+const provider =
+  providerMode === "proxy"
+    ? new CodexOAuthProxyAdapter(loadCodexOAuthProxyConfig())
+    : new CodexProviderAdapter(
+        new AppServerClient(
+          new StdioAppServerTransport({
+            cwd: root,
+            ...(process.env.THREADFLOW_CODEX_BIN
+              ? { codexBin: process.env.THREADFLOW_CODEX_BIN }
+              : {}),
+          }),
+        ),
+        {
+          cwd: root,
+          ...(process.env.THREADFLOW_CODEX_MODEL
+            ? { model: process.env.THREADFLOW_CODEX_MODEL }
+            : {}),
+        },
+      );
 const app = await buildGateway({
   port,
   allowedOrigins,
@@ -54,6 +65,11 @@ try {
   process.stdout.write(
     "Paste the file contents, not the file path, into the app settings.\n",
   );
+  process.stdout.write(`Codex provider mode: ${providerMode}\n`);
+  if (providerMode === "proxy" && !loadCodexOAuthProxyConfig().enabled)
+    process.stdout.write(
+      "Codex OAuth Proxy is not configured; the UI remains available but generation is disabled.\n",
+    );
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
     process.stderr.write(

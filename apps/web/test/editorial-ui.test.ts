@@ -272,11 +272,7 @@ describe("editorial studio UI", () => {
     expect(host.querySelector('[aria-label="완성된 글 편집"]')).not.toBeNull();
     expect(button("복사하고 Threads 열기").disabled).toBe(true);
     expect(host.querySelector(".safe")?.textContent).toContain("직접 확인");
-    await act(async () =>
-      useWorkflowStore
-        .getState()
-        .approve({ ...draft, approvalStatus: "APPROVED" }),
-    );
+    await act(async () => button("최종 승인 저장").click());
     expect(button("복사하고 Threads 열기").disabled).toBe(false);
     await act(async () => useWorkflowStore.getState().edit("수정한 내용"));
     expect(button("복사하고 Threads 열기").disabled).toBe(true);

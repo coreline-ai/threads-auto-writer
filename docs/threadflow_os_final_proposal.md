@@ -109,6 +109,12 @@ OpenAI 공식 문서상 Codex는 ChatGPT 로그인 기반 구독 접근을 지�
 
 ## 4. Codex OAuth Provider Proxy 설계
 
+### 2026-09-07 구현 결정
+
+최종 운영 경로는 `ThreadFlow Gateway → loopback Codex OAuth Provider Proxy → Codex`로 고정했다. Proxy가 OAuth 세션·queue·upstream을 소유하고 ThreadFlow Gateway는 `conversation.respond.v1` caller로만 동작한다. 기존 Gateway→Codex App Server 직접 연결은 `THREADFLOW_CODEX_PROVIDER=direct`로 명시한 로컬 개발 fallback이며 Proxy 실패 시 자동 전환하지 않는다.
+
+구현은 loopback URL·caller secret `0600`·timeout·취소·오류 마스킹, client/server canonical SHA-256 멱등성, Provider output DLP, credential-free 승인/수동 전달 snapshot을 포함한다. 실행 값과 HTTP 계약은 [Codex OAuth Proxy 설정](codex-oauth-proxy-setup.md)을 따른다.
+
 ### 인증 흐름
 
 ```text

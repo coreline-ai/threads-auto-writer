@@ -6,6 +6,8 @@
 
 Phase 0~9의 저장소 내 구현 범위는 완료했다. 개인용 MVP, Codex 품질 파이프라인, localhost 자체 웹, Chrome Extension, 공식 Threads API Scheduler, Insights, Tenant 격리까지 코드와 자동 테스트를 구성했다. **개인 사용은 `pnpm start:web`으로 먼저 실행하고, 필요한 경우 Chrome 개발자 모드로 확장할 수 있다.**
 
+2026-09-07부터 생성 기본 경로는 Codex App Server 직접 연결이 아니라 **Codex OAuth Provider Proxy**다. Phase 0의 직접 App Server Live Spike는 역사적 검증 및 명시적 `direct` 개발 fallback 근거이며, 현재 기본 운영 계약을 뜻하지 않는다.
+
 Chrome Web Store와 Apple 서명·공증은 공개 배포를 선택할 때만 필요한 Gate다. Meta 실계정 자동 게시, 공개 SaaS, 신규 사용자 장기 사용은 별도 자격 증명과 운영 검증이 필요하므로 개인 개발자 모드 완료 상태와 분리한다. 현재 웹의 **복사하고 Threads 열기**와 Side Panel의 **Threads 작성 화면으로**는 사용자 최종 확인 흐름이며, Phase 8 자동 게시는 별도 Scheduler REST API 경로다.
 
 필수 기능 정확성·사용성 재검토와 수정 내역은 [전문가 재검토 보고서](correctness-usability-audit.md)를 따른다.
@@ -58,3 +60,15 @@ Chrome Web Store와 Apple 서명·공증은 공개 배포를 선택할 때만 �
 - 전체 **125/125**, Golden **30/30**, 타입·린트·포맷·두 앱 빌드·설치물 갱신 PASS.
 - 실제 웹 Codex 생성·수정안 버리기/적용·승인·새 작업·검색·복원 PASS. 첫 Provider 오류와 재시도 성공을 구분해 기록했다.
 - 상세: [구현 검토](convenience-theme-review.md). 모바일 키보드·네이티브 Extension/Threads 전달은 여전히 수동 검증 항목이다.
+
+## Proxy 기본 경로·무결성 경계 — 2026-09-07
+
+- Gateway 기본 Provider를 loopback Codex OAuth Provider Proxy로 전환하고, direct App Server는 명시적 개발 fallback으로 제한했다.
+- `gpt-5.6-sol` + `xhigh` 품질 프로필, 4,000자 메시지 계약 chunking, caller secret `0600`, timeout·취소·오류 마스킹을 적용했다.
+- canonical SHA-256 요청 지문과 `Idempotency-Key`로 브라우저 재전송·다중 탭 중복 호출을 제어하고 서버에서 지문을 재검증한다.
+- Provider의 완전 출력과 보류한 raw delta가 DLP를 통과한 뒤에만 SSE/UI로 전달된다.
+- 본문·요청·소스·위험·이미지 바이트/Alt Text hash를 묶은 승인 snapshot과 credential-free 수동 전달 pack을 적용했다.
+- 자동 검증 **141/141**, Golden **30/30**, 타입·린트·포맷·웹/Extension build·ZIP·Companion 패키지 PASS.
+- 전용 `threadflow` caller와 `0600` credential을 이 Mac의 Proxy에 등록했고, 격리된 실 Proxy에서 5단계 생성, 후보 3개, 최종 173자, 요청 지문 일치까지 PASS했다.
+- 상시 `4348` Proxy는 연결되지 않은 외부 장치 watchdog이 약 30초마다 모든 Proxy를 재시작하는 운영 문제가 확인됐다. 전역 보호 기능은 사용자 명시 승인 없이 변경하지 않았으며, 해당 watchdog 범위 분리 전까지 기본 daemon의 장시간 생성은 신뢰할 수 없다.
+- 상세 설정: [Codex OAuth Proxy 설정](codex-oauth-proxy-setup.md), 개발 계획: [구현 계획](../dev-plan/implement_20260907_210320.md).

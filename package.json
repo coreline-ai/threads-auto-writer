@@ -2,7 +2,7 @@
   "name": "threadflow-os",
   "version": "0.1.0",
   "private": true,
-  "description": "Quality-first Threads writing companion powered by Codex App Server",
+  "description": "Quality-first Threads writing companion powered by Codex OAuth Provider Proxy",
   "type": "module",
   "packageManager": "pnpm@11.13.1",
   "engines": {

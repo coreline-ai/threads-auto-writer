@@ -5,10 +5,11 @@ import {
   type GenerationEvent,
   type GenerationRequest,
 } from "@threadflow-os/contracts";
+import { generationRequestFingerprint } from "@threadflow-os/shared/fingerprint";
 
 export class GatewayClient {
   #sessionToken: string | null = null;
-  #pendingGeneration: Promise<{ id: string }> | null = null;
+  #pendingGenerations = new Map<string, Promise<{ id: string }>>();
 
   constructor(
     private readonly baseUrl = "http://127.0.0.1:8787",
@@ -35,15 +36,23 @@ export class GatewayClient {
   }
 
   createGeneration(request: GenerationRequest): Promise<{ id: string }> {
-    if (this.#pendingGeneration) return this.#pendingGeneration;
+    const fingerprint = generationRequestFingerprint(request);
+    const active = this.#pendingGenerations.get(fingerprint);
+    if (active) return active;
+    const idempotencyKey = `tf-generation:${crypto.randomUUID()}`;
     const pending = this.request("/v1/generations", {
       method: "POST",
+      headers: {
+        "idempotency-key": idempotencyKey,
+        "x-request-fingerprint": fingerprint,
+      },
       body: JSON.stringify(request),
     }) as Promise<{ id: string }>;
-    this.#pendingGeneration = pending.finally(() => {
-      if (this.#pendingGeneration === guarded) this.#pendingGeneration = null;
+    const guarded = pending.finally(() => {
+      if (this.#pendingGenerations.get(fingerprint) === guarded)
+        this.#pendingGenerations.delete(fingerprint);
     });
-    const guarded = this.#pendingGeneration;
+    this.#pendingGenerations.set(fingerprint, guarded);
     return guarded;
   }
 

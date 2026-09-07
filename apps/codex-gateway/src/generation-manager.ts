@@ -15,6 +15,8 @@ import {
 } from "@threadflow-os/quality-engine";
 import { buildRevisionPrompt } from "@threadflow-os/prompt-kit";
 import { createId, nowIso } from "@threadflow-os/shared";
+import { generationRequestFingerprint } from "@threadflow-os/shared/fingerprint";
+import { assertProviderOutputSafe } from "@threadflow-os/shared/runtime-security";
 
 export type GenerationProviderSession = StructuredTextProvider & {
   close(): Promise<void>;
@@ -28,6 +30,7 @@ export type GenerationSnapshot = {
   result: PipelineResult | null;
   error: { code: ApiErrorCode; message: string; retryable: boolean } | null;
   providerThreadId: string | null;
+  requestFingerprint: string;
 };
 
 type Job = GenerationSnapshot & {
@@ -41,15 +44,47 @@ type Job = GenerationSnapshot & {
 
 export class GenerationManager {
   readonly #jobs = new Map<string, Job>();
+  readonly #idempotency = new Map<
+    string,
+    { fingerprint: string; jobId: string; expiresAt: number }
+  >();
+  readonly #activeFingerprints = new Map<string, string>();
 
   constructor(
     private readonly createProvider: () => GenerationProviderSession,
+    private readonly idempotencyTtlMs = 10 * 60_000,
   ) {}
 
-  create(input: unknown): GenerationSnapshot {
+  create(
+    input: unknown,
+    identity: { idempotencyKey: string; requestFingerprint: string },
+  ): GenerationSnapshot {
     const request = GenerationRequestSchema.parse(input);
+    const fingerprint = generationRequestFingerprint(request);
+    if (identity.requestFingerprint !== fingerprint)
+      throw new Error("IDEMPOTENCY_CONFLICT");
+    this.cleanupIdempotency();
+    const keyed = this.#idempotency.get(identity.idempotencyKey);
+    if (keyed) {
+      if (keyed.fingerprint !== fingerprint)
+        throw new Error("IDEMPOTENCY_CONFLICT");
+      const existing = this.#jobs.get(keyed.jobId);
+      if (existing) return this.snapshot(existing);
+      this.#idempotency.delete(identity.idempotencyKey);
+    }
+    const activeId = this.#activeFingerprints.get(fingerprint);
+    const active = activeId ? this.#jobs.get(activeId) : undefined;
+    if (active && !isTerminal(active.state)) {
+      this.#idempotency.set(identity.idempotencyKey, {
+        fingerprint,
+        jobId: active.id,
+        expiresAt: Date.now() + this.idempotencyTtlMs,
+      });
+      return this.snapshot(active);
+    }
+    if (activeId) this.#activeFingerprints.delete(fingerprint);
     const id = createId("generation");
-    const provider = this.createProvider();
+    const provider = guardProviderOutput(this.createProvider());
     const now = nowIso();
     const job: Job = {
       id,
@@ -60,12 +95,19 @@ export class GenerationManager {
       result: null,
       error: null,
       providerThreadId: null,
+      requestFingerprint: fingerprint,
       abort: new AbortController(),
       events: [],
       bus: new EventEmitter(),
       provider,
     };
     this.#jobs.set(id, job);
+    this.#activeFingerprints.set(fingerprint, id);
+    this.#idempotency.set(identity.idempotencyKey, {
+      fingerprint,
+      jobId: id,
+      expiresAt: Date.now() + this.idempotencyTtlMs,
+    });
     this.emit(job, {
       type: "state",
       generationId: id,
@@ -210,6 +252,10 @@ export class GenerationManager {
     job.events.push(event);
     job.updatedAt = event.at;
     if (event.type === "state") job.state = event.state;
+    if (event.type === "state" && isTerminal(event.state)) {
+      if (this.#activeFingerprints.get(job.requestFingerprint) === job.id)
+        this.#activeFingerprints.delete(job.requestFingerprint);
+    }
     if (event.type === "result") {
       job.result = {
         candidates: event.candidates,
@@ -228,8 +274,20 @@ export class GenerationManager {
       result: job.result,
       error: job.error,
       providerThreadId: job.providerThreadId,
+      requestFingerprint: job.requestFingerprint,
     };
   }
+
+  private cleanupIdempotency(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.#idempotency) {
+      if (entry.expiresAt <= now) this.#idempotency.delete(key);
+    }
+  }
+}
+
+function isTerminal(state: GenerationState): boolean {
+  return ["COMPLETED", "FAILED", "CANCELED"].includes(state);
 }
 
 export function normalizeGenerationError(error: unknown): {
@@ -257,6 +315,12 @@ export function normalizeGenerationError(error: unknown): {
       message: "생성이 취소되었습니다.",
       retryable: false,
     };
+  if (/SENSITIVE_PROVIDER_OUTPUT/i.test(message))
+    return {
+      code: "SENSITIVE_PROVIDER_OUTPUT",
+      message: "Provider 응답에 민감 정보가 포함되어 결과를 차단했습니다.",
+      retryable: true,
+    };
   if (/timed out|exited|unavailable|ECONN|ENOENT|App Server/i.test(message))
     return {
       code: "PROVIDER_UNAVAILABLE",
@@ -269,9 +333,57 @@ export function normalizeGenerationError(error: unknown): {
       message: "구조화 출력 검증에 실패했습니다.",
       retryable: true,
     };
+  if (/IDEMPOTENCY_CONFLICT/i.test(message))
+    return {
+      code: "IDEMPOTENCY_CONFLICT",
+      message: "멱등성 키와 생성 요청이 일치하지 않습니다.",
+      retryable: false,
+    };
   return {
     code: "INTERNAL",
     message: "생성 처리 중 오류가 발생했습니다.",
     retryable: false,
+  };
+}
+
+function guardProviderOutput(
+  provider: GenerationProviderSession,
+): GenerationProviderSession {
+  return {
+    threadId: () => provider.threadId(),
+    close: () => provider.close(),
+    async generateJson(call) {
+      // Raw model deltas are withheld until the complete structured value has
+      // passed DLP. Stage events still provide deterministic progress.
+      const bufferedDeltas: string[] = [];
+      const { onDelta, ...safeCall } = call;
+      const output = await provider.generateJson({
+        ...safeCall,
+        onDelta: (delta) => bufferedDeltas.push(delta),
+      });
+      assertProviderOutputSafe(output);
+      assertProviderOutputSafe(bufferedDeltas.join(""));
+      for (const delta of bufferedDeltas) onDelta?.(delta);
+      return output;
+    },
+    ...(provider.revise
+      ? {
+          async revise(
+            threadId: string,
+            prompt: string,
+            schema: Record<string, unknown>,
+            signal?: AbortSignal,
+          ) {
+            const output = await provider.revise!(
+              threadId,
+              prompt,
+              schema,
+              signal,
+            );
+            assertProviderOutputSafe(output);
+            return output;
+          },
+        }
+      : {}),
   };
 }

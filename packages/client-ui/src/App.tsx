@@ -29,6 +29,15 @@ import {
 } from "@threadflow-os/quality-engine/deterministic";
 import { diffWords, type DiffChunk } from "@threadflow-os/shared/diff";
 import { GatewayClient } from "./gateway-client.js";
+import {
+  approvalInvalidationReasons,
+  createApprovalSnapshot,
+  createManualHandoffPack,
+  type ApprovalContext,
+  type ApprovalSnapshot,
+  type SelectedImageReference,
+} from "./manual-handoff.js";
+import { sha256BytesHex } from "@threadflow-os/shared/fingerprint";
 import type { ClientRuntime, ComposerHandoffResult } from "./runtime.js";
 import {
   db,
@@ -250,11 +259,9 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
     to: number;
     chunks: DiffChunk[];
   } | null>(null);
-  const [image, setImage] = useState<{
-    name: string;
-    size: number;
-    altText: string;
-  } | null>(null);
+  const [image, setImage] = useState<SelectedImageReference | null>(null);
+  const [approvalSnapshot, setApprovalSnapshot] =
+    useState<ApprovalSnapshot | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [saveState, setSaveState] = useState<
     "loading" | "saving" | "saved" | "error"
@@ -265,6 +272,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [pendingAuthUrl, setPendingAuthUrl] = useState<string | null>(null);
   const deletingData = useRef(false);
+  const imageReadSequence = useRef(0);
   const resultRef = useRef<HTMLElement>(null);
 
   const gateway = useMemo(
@@ -369,6 +377,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       activeRequest,
       selectedCandidateId,
       image,
+      approvalSnapshot,
       workflow: {
         source: workflow.source,
         generationId: workflow.generationId,
@@ -395,6 +404,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       activeRequest,
       selectedCandidateId,
       image,
+      approvalSnapshot,
       workflow.source,
       workflow.generationId,
       workflow.stage,
@@ -512,6 +522,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
               : {}),
             activeRequest: r ?? null,
             selectedCandidateId: stored.finalDraft.selectedCandidateId,
+            approvalSnapshot: stored.approvalSnapshot ?? null,
             workflow: {
               ...value.workflow,
               source: r?.source ?? null,
@@ -600,6 +611,32 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
     return deterministicFlags(activeRequest, workflow.editorText);
   }, [activeRequest, workflow.editorText, workflow.finalDraft]);
   const blocking = liveFlags.some((flag) => flag.severity === "blocking");
+  const approvalContext = useMemo<ApprovalContext | null>(
+    () =>
+      workflow.finalDraft
+        ? {
+            draft: workflow.finalDraft,
+            text: workflow.editorText,
+            request: activeRequest,
+            source: workflow.source,
+            riskFlags: liveFlags,
+            image,
+          }
+        : null,
+    [
+      workflow.finalDraft,
+      workflow.editorText,
+      workflow.source,
+      activeRequest,
+      liveFlags,
+      image,
+    ],
+  );
+  const approvalValid = Boolean(
+    approvalContext &&
+    workflow.finalDraft?.approvalStatus === "APPROVED" &&
+    approvalInvalidationReasons(approvalSnapshot, approvalContext).length === 0,
+  );
   const editorDiff = useMemo(
     () =>
       workflow.finalDraft
@@ -624,8 +661,12 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       const result = await auth.refetch();
       setNotice(
         result.data?.authenticated
-          ? "Codex 구독 연결을 확인했습니다."
-          : "Companion은 연결됐지만 Codex 로그인이 필요합니다.",
+          ? result.data.providerMode === "proxy"
+            ? "Codex OAuth Provider Proxy 준비 상태를 확인했습니다."
+            : "Codex 구독 연결을 확인했습니다."
+          : result.data?.providerMode === "proxy"
+            ? "Companion은 연결됐지만 Codex OAuth Proxy 설정 또는 실행 상태를 확인해야 합니다."
+            : "Companion은 연결됐지만 Codex 로그인이 필요합니다.",
       );
     } catch (error) {
       setNotice(readableError(error, "Companion 연결에 실패했습니다."));
@@ -785,6 +826,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
         workflow.setSource(source);
         const { id } = await gateway.createGeneration(request);
         generationId = id;
+        setApprovalSnapshot(null);
         setActiveRequest(request);
         setSelectedCandidateId(null);
         workflow.begin(id);
@@ -839,7 +881,8 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       return setNotice("빈 글은 승인 저장할 수 없습니다.");
     if (
       workflow.finalDraft.approvalStatus === "APPROVED" &&
-      workflow.finalDraft.text === workflow.editorText
+      workflow.finalDraft.text === workflow.editorText &&
+      approvalValid
     )
       return setNotice("현재 편집본은 이미 승인 저장되었습니다.");
     actionLock.current = true;
@@ -863,6 +906,15 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
         (max, item) => Math.max(max, item.version),
         0,
       );
+      const approvalRecord = createApprovalSnapshot({
+        draft: approved,
+        text: approved.text,
+        request: activeRequest,
+        source: workflow.source,
+        riskFlags: liveFlags,
+        image,
+        draftVersion: current + 1,
+      });
       await db.saveDraftVersion(
         {
           id: approved.id,
@@ -873,6 +925,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
           request: activeRequest,
           createdAt: approved.createdAt,
           updatedAt: now,
+          approvalSnapshot: approvalRecord,
         },
         current,
       );
@@ -891,7 +944,8 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
         currentState.editorText === approved.text
       ) {
         workflow.approve(approved);
-        setNotice("최종 승인 Snapshot을 로컬에 저장했습니다.");
+        setApprovalSnapshot(approvalRecord);
+        setNotice("최종 승인 Snapshot과 무결성 지문을 로컬에 저장했습니다.");
       } else {
         setNotice(
           "요청 시점의 승인본을 저장했습니다. 이후 편집한 본문은 보존했으며 다시 승인해야 합니다.",
@@ -915,17 +969,25 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       countThreadsTextUnits(workflow.editorText) > 500
     )
       return;
-    if (
-      workflow.finalDraft.approvalStatus !== "APPROVED" ||
-      workflow.finalDraft.text !== workflow.editorText
-    ) {
+    if (!approvalValid || !approvalSnapshot || !approvalContext) {
       return setNotice("현재 편집본을 최종 승인 저장한 뒤 전달하세요.");
     }
     actionLock.current = true;
     setActionBusy(true);
     try {
+      let pack;
       try {
-        await navigator.clipboard.writeText(workflow.editorText);
+        pack = createManualHandoffPack(approvalSnapshot, approvalContext);
+      } catch (error) {
+        return setNotice(
+          readableError(
+            error,
+            "승인본 무결성을 확인하지 못했습니다. 다시 승인하세요.",
+          ),
+        );
+      }
+      try {
+        await navigator.clipboard.writeText(pack.copy.body);
       } catch {
         return setNotice(
           "클립보드에 복사하지 못했습니다. 브라우저의 클립보드 권한을 확인하세요.",
@@ -933,7 +995,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       }
       let result: ComposerHandoffResult;
       try {
-        result = await runtime.openComposer(workflow.editorText);
+        result = await runtime.openComposer(pack.copy.body);
       } catch {
         return setNotice(
           "Threads 작성창을 열지 못했습니다. 초안은 클립보드에 보존했습니다.",
@@ -1067,6 +1129,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
       setPublicationLinks([]);
       setVersionDiff(null);
       setImage(null);
+      setApprovalSnapshot(null);
       setBootstrapSecret("");
       gateway.resetSession();
       setNotice(
@@ -1100,6 +1163,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
 
   function restoreWorkspace(workspace: WorkspaceSnapshot) {
     setImage(workspace.image ?? null);
+    setApprovalSnapshot(workspace.approvalSnapshot ?? null);
     setView(workspace.view);
     setPurpose(workspace.purpose);
     setSourceUrl(workspace.sourceUrl);
@@ -1239,17 +1303,32 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
     await refreshLibrary();
   }
 
-  function handleImage(file?: File) {
+  async function handleImage(file?: File) {
+    const sequence = ++imageReadSequence.current;
     if (!file) return setImage(null);
     if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) {
       setNotice("이미지는 10MB 이하의 이미지 파일만 선택할 수 있습니다.");
       return;
     }
-    setImage({
-      name: file.name,
-      size: file.size,
-      altText: file.name.replace(/[-_]/g, " ").replace(/\.[^.]+$/, ""),
-    });
+    setNotice("이미지 바이트 무결성을 확인하는 중…");
+    try {
+      const sha256 = sha256BytesHex(new Uint8Array(await file.arrayBuffer()));
+      if (sequence !== imageReadSequence.current) return;
+      setImage({
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+        sha256,
+        altText: file.name.replace(/[-_]/g, " ").replace(/\.[^.]+$/, ""),
+      });
+      setNotice(
+        "이미지 해시를 기록했습니다. 승인 후 Threads에서 같은 파일을 직접 첨부하세요.",
+      );
+    } catch {
+      if (sequence !== imageReadSequence.current) return;
+      setImage(null);
+      setNotice("이미지를 읽지 못했습니다. 파일을 다시 선택하세요.");
+    }
   }
 
   return (
@@ -1287,8 +1366,12 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
             {auth.isFetching
               ? "연결 확인 중"
               : auth.data?.authenticated && !auth.isError
-                ? "Codex 연결됨"
-                : "Codex 연결 설정"}
+                ? auth.data.providerMode === "proxy"
+                  ? "Proxy 준비됨"
+                  : "Codex 연결됨"
+                : auth.data?.providerMode === "proxy"
+                  ? "Proxy 연결 설정"
+                  : "Codex 연결 설정"}
           </button>
         </div>
       </header>
@@ -1765,7 +1848,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
                         type="file"
                         accept="image/*"
                         onChange={(event) =>
-                          handleImage(event.target.files?.[0])
+                          void handleImage(event.target.files?.[0])
                         }
                       />
                     </label>
@@ -1787,10 +1870,7 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
                   </details>
                   <EditorActions
                     text={workflow.editorText}
-                    approved={
-                      workflow.finalDraft.approvalStatus === "APPROVED" &&
-                      workflow.finalDraft.text === workflow.editorText
-                    }
+                    approved={approvalValid}
                     blocking={blocking}
                     warningCount={liveFlags.length}
                     busy={actionBusy || revisionBusy}
@@ -2081,12 +2161,28 @@ export function App({ runtime }: { runtime: ClientRuntime }) {
             </form>
             {auth.data && (
               <div className="account-box">
-                <b>{auth.data.accountType ?? "로그아웃됨"}</b>
-                <span>{auth.data.planType ?? "—"}</span>
+                <b>
+                  {auth.data.providerMode === "proxy"
+                    ? "Codex OAuth Proxy"
+                    : (auth.data.accountType ?? "로그아웃됨")}
+                </b>
+                <span>
+                  {auth.data.providerMode === "proxy"
+                    ? auth.data.authenticated
+                      ? "Proxy readiness 확인됨"
+                      : `Proxy 확인 필요 · ${auth.data.readinessReason ?? "unavailable"}`
+                    : (auth.data.planType ?? "—")}
+                </span>
                 <span>Provider {auth.data.providerVersion ?? "—"}</span>
               </div>
             )}
-            {!auth.data?.authenticated ? (
+            {auth.data?.providerMode === "proxy" ? (
+              <p className="safety-note">
+                ChatGPT OAuth 로그인·로그아웃은 Codex OAuth Provider Proxy에서
+                관리합니다. ThreadFlow에는 Proxy caller secret이나 OAuth token을
+                입력하지 않습니다.
+              </p>
+            ) : !auth.data?.authenticated ? (
               <button
                 className="wide"
                 disabled={connectionBusy}

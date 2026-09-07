@@ -7,6 +7,7 @@ import {
 } from "@threadflow-os/contracts";
 import type { CodexProviderAdapter } from "@threadflow-os/codex-provider";
 import { SessionTokens } from "@threadflow-os/shared";
+import { generationRequestFingerprint } from "@threadflow-os/shared/fingerprint";
 import {
   GenerationManager,
   normalizeGenerationError,
@@ -67,7 +68,13 @@ export async function buildGateway(
       );
     },
     credentials: false,
-    allowedHeaders: ["content-type", "authorization", "x-threadflow-bootstrap"],
+    allowedHeaders: [
+      "content-type",
+      "authorization",
+      "x-threadflow-bootstrap",
+      "idempotency-key",
+      "x-request-fingerprint",
+    ],
     methods: ["GET", "POST", "DELETE", "OPTIONS"],
   });
 
@@ -160,10 +167,48 @@ export async function buildGateway(
         "INVALID_REQUEST",
         "생성 요청 형식이 올바르지 않습니다.",
       );
+    const idempotencyKey = request.headers["idempotency-key"];
+    const claimedFingerprint = request.headers["x-request-fingerprint"];
+    if (
+      typeof idempotencyKey !== "string" ||
+      !/^[A-Za-z0-9._:-]{16,200}$/u.test(idempotencyKey) ||
+      typeof claimedFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(claimedFingerprint)
+    )
+      return reject(
+        reply,
+        400,
+        "INVALID_REQUEST",
+        "생성 요청의 멱등성 키와 지문이 필요합니다.",
+      );
+    const actualFingerprint = generationRequestFingerprint(parsed.data);
+    if (claimedFingerprint !== actualFingerprint)
+      return reject(
+        reply,
+        409,
+        "IDEMPOTENCY_CONFLICT",
+        "요청 지문이 실제 생성 입력과 다릅니다.",
+      );
     const auth = await config.provider.getAuthStatus();
     if (!auth.authenticated)
       return reject(reply, 401, "AUTH_REQUIRED", "Codex 로그인이 필요합니다.");
-    return reply.code(202).send(manager.create(parsed.data));
+    try {
+      return reply.code(202).send(
+        manager.create(parsed.data, {
+          idempotencyKey,
+          requestFingerprint: actualFingerprint,
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "IDEMPOTENCY_CONFLICT")
+        return reject(
+          reply,
+          409,
+          "IDEMPOTENCY_CONFLICT",
+          "멱등성 키가 다른 생성 입력에 이미 사용됐습니다.",
+        );
+      throw error;
+    }
   });
 
   app.get("/v1/generations/:id", async (request, reply) => {
@@ -282,9 +327,13 @@ export async function buildGateway(
           ? 429
           : normalized.code === "PROVIDER_UNAVAILABLE"
             ? 503
-            : normalized.code === "INVALID_OUTPUT"
-              ? 502
-              : 500;
+            : normalized.code === "IDEMPOTENCY_CONFLICT"
+              ? 409
+              : normalized.code === "SENSITIVE_PROVIDER_OUTPUT"
+                ? 502
+                : normalized.code === "INVALID_OUTPUT"
+                  ? 502
+                  : 500;
     return reply.code(status).send({ error: normalized });
   });
 

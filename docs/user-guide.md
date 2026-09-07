@@ -2,15 +2,15 @@
 
 ## 웹 우선 사용 결론
 
-개인 PC에서는 먼저 Chrome Extension 없이 localhost 자체 웹을 실행할 수 있다. 웹에서 주제·메모를 직접 입력해 1턴 생성·편집·승인·보관을 사용하고, 현재 Threads 게시물 캡처와 작성창 자동 입력이 필요할 때 Chrome Extension을 설치한다.
+개인 PC에서는 먼저 Chrome Extension 없이 localhost 자체 웹을 실행할 수 있다. 웹에서 주제·메모를 직접 입력해 사용자 1회 실행·편집·승인·보관을 사용하고, 현재 Threads 게시물 캡처와 작성창 자동 입력이 필요할 때 Chrome Extension을 설치한다.
 
-웹 실행에는 외부 발급 값이 없다. 로컬에서 자동 생성되는 Companion 연결 키와 AI 생성을 위한 ChatGPT OAuth 로그인만 필요하다. Codex는 ChatGPT OAuth 구독 로그인을 사용하므로 LLM API Key가 필요하지 않다. Extension을 사용할 때만 Chrome이 표시하는 Extension ID가 추가로 필요하며, 작성창 자동 입력에는 동일 Chrome 프로필의 Threads 웹 로그인이 필요하다. 전체 값 구분은 [외부 값과 로컬 생성 값](external-values.md)을 따른다.
+웹의 기본 생성 경로는 Codex OAuth Provider Proxy다. LLM API Key 대신 Proxy 운영자가 발급한 caller ID/secret 파일과 loopback Proxy 주소가 필요하며, ChatGPT OAuth은 Proxy에서 관리한다. ThreadFlow 자체의 Companion 연결 키는 로컬에서 별도로 자동 생성된다. Extension을 사용할 때만 Chrome이 표시하는 Extension ID가 추가로 필요하며, 작성창 자동 입력에는 동일 Chrome 프로필의 Threads 웹 로그인이 필요하다. 전체 값 구분은 [외부 값과 로컬 생성 값](external-values.md)을 따른다.
 
 ## 1. 자체 웹 실행
 
-1. Node.js 22 이상과 Codex CLI를 설치한다.
-2. 프로젝트에서 `pnpm install`을 한 번 실행한다.
-3. 다음 명령으로 웹과 Gateway를 함께 실행한다.
+1. Node.js 22 이상을 설치한다.
+2. [Codex OAuth Proxy 설정](codex-oauth-proxy-setup.md)에 따라 Proxy를 실행하고 caller 환경 변수를 export한다.
+3. 프로젝트에서 `pnpm install`을 한 번 실행한 뒤 웹과 Gateway를 함께 실행한다.
 
 ```bash
 pnpm start:web
@@ -19,7 +19,7 @@ pnpm start:web
 4. Chrome, Edge 등 현대적인 브라우저에서 `http://127.0.0.1:4173`을 연다.
 5. Terminal에서 `cat .threadflow/session-secret`를 실행한다.
 6. 파일 **내용**을 웹 앱의 **설정 → Companion 연결 키**에 붙여넣는다. 파일 경로를 붙여넣으면 안 된다.
-7. **ChatGPT 구독으로 로그인**을 눌러 OAuth를 완료하고 **Codex 상태 확인**을 누른다.
+7. **Codex 상태 확인**을 눌러 `Proxy readiness 확인됨`을 확인한다. OAuth 로그인·로그아웃은 Proxy 운영 절차에서 수행한다.
 
 웹은 브라우저 탭의 Threads DOM에 접근할 수 없으므로 현재 게시물 자동 캡처는 제공하지 않는다. 승인한 글은 **복사하고 Threads 열기**로 클립보드에 저장한 뒤 Threads를 열며, 사용자가 작성창에 붙여넣고 게시를 확정한다.
 
@@ -27,7 +27,7 @@ pnpm start:web
 
 ### 권장: Chrome 개발자 모드
 
-1. Node.js 22 이상과 Codex CLI를 설치한다.
+1. Node.js 22 이상과 실행 중인 Codex OAuth Provider Proxy를 준비한다.
 2. 같은 Chrome 프로필에서 `https://www.threads.com/`에 로그인한다.
 3. 프로젝트에서 `pnpm install && pnpm build`를 실행한다.
 4. Chrome `chrome://extensions`에서 개발자 모드를 켠다.
@@ -56,12 +56,12 @@ pnpm start:web
 2. `새 글`, `다듬기`, `짧게`, `다른 관점`, `제휴 글` 중 원하는 모드를 고른다. 목적·후보 수·Persona·근거를 바꾸려면 **문체·근거 설정**만 펼친다.
 3. **1턴으로 완성하기**를 누른다. 분석·후보 작성·편집장 평가·개선·위험 검수와 최종 후보 선택이 한 번에 진행된다.
 4. 완성된 글을 확인한다. 필요한 경우 직접 편집하거나 **첫 문장 개선 / 마무리 개선 / 지시해서 수정**을 요청하고, 선택 사항인 후보 비교를 펼쳐 다른 안으로 바꿀 수 있다.
-5. 차단 위험을 해소한 후 **최종 승인 저장**을 누른다. 웹에서는 **복사하고 Threads 열기**, Extension에서는 **Threads 작성 화면으로**를 누른다. 초안은 항상 먼저 클립보드에 저장된다.
+5. 차단 위험을 해소한 후 **최종 승인 저장**을 누른다. 이 때 본문·소스·요청·위험·이미지 참조를 묶은 무결성 지문이 저장된다. 웹에서는 **복사하고 Threads 열기**, Extension에서는 **Threads 작성 화면으로**를 누른다. 전달 직전 현재 본문과 승인 지문을 다시 검증하며, 다르면 재승인 전까지 차단한다.
 6. 웹에서는 클립보드 초안을 직접 붙여넣는다. Extension은 Threads 웹 로그인이 확인되고 작성창을 찾았을 때만 자동 입력하며, 실패하면 클립보드 초안을 직접 붙여넣는다.
 7. Threads 기본 UI에서 이미지, 날짜·시간을 확인하고 게시 또는 예약을 직접 확정한다.
 8. 게시 후 보관함의 **게시 결과 연결**에 실제 Threads URL을 기록할 수 있다.
 
-1턴은 **사용자 입력부터 검수된 최종 초안까지의 AI 작성 과정**을 뜻한다. 계정에 실제로 게시하는 동작은 오게시 방지를 위해 사용자 승인과 Threads 최종 확인을 생략하지 않는다.
+1턴은 **사용자가 한 번 요청하면 검수된 최종 초안까지 자동 진행되는 UX**를 뜻한다. 내부 LLM 호출은 분석·전략·후보·비평·최종 개선의 여러 Provider turn으로 구성한다. 계정에 실제로 게시하는 동작은 오게시 방지를 위해 사용자 승인과 Threads 최종 확인을 생략하지 않는다.
 
 ## 4. 자동 저장과 복구
 
@@ -70,7 +70,7 @@ pnpm start:web
 - 웹과 Extension은 서로 다른 Origin의 IndexedDB를 사용하므로 Draft가 자동 동기화되지는 않는다. 필요하면 보관함의 로컬 데이터 내보내기로 백업한다.
 - 진행 중 생성은 같은 Gateway 작업이 남아 있으면 SSE를 다시 연결한다.
 - Gateway가 재시작되어 작업이 사라졌다면 입력·편집 내용은 보존하고 새 파이프라인 실행을 안내한다.
-- 보관함 Draft는 저장 당시 Source·Persona·근거와 함께 복원된다. 구버전 Draft에 검수 기준이 없으면 변경본 승인을 차단하고 재생성을 안내한다.
+- 보관함 Draft는 저장 당시 Source·Persona·근거·승인 지문과 함께 복원된다. 구버전 승인 Draft에 무결성 snapshot이 없으면 전달 전 한 번 재승인해야 한다.
 
 ## 5. 주의
 
@@ -99,4 +99,8 @@ pnpm start:web
 
 다른 탭에서 같은 작업을 먼저 저장하면 덮어쓰지 않고 충돌을 알린다. **설정 → 로컬 데이터 내보내기**로 현재 입력을 먼저 보관한 뒤 다른 탭을 닫고 새로고침한다. 미저장 본문은 JSON의 **currentRecovery**에 포함된다. 자동 가져오기는 없으므로 필요할 때 본문을 직접 복사해 복원한다.
 
-v3 작업은 v4로 자동 이관하며 기존 승인 버전과 원본 백업은 유지한다. 파일 원본이 아닌 이미지 이름·크기·Alt Text만 보관한다. 웹과 Extension 데이터는 서로 다른 Origin에 저장되어 자동 합쳐지지 않는다.
+v3 작업은 v4로 자동 이관하며 기존 승인 버전과 원본 백업은 유지한다. 이미지 선택 시 이름·크기·MIME·Alt Text·파일 byte SHA-256를 보관하지만 파일 원본은 저장·전송하지 않는다. Threads에서 승인 때 선택한 같은 이미지를 직접 첨부한다. 웹과 Extension 데이터는 서로 다른 Origin에 저장되어 자동 합쳐지지 않는다.
+
+## 9. direct 개발 모드
+
+Proxy가 없는 로컬 회귀 테스트에서만 `THREADFLOW_CODEX_PROVIDER=direct pnpm start:web`을 사용한다. Codex CLI가 필요하며 이 모드에서만 ThreadFlow 설정의 **ChatGPT 구독으로 로그인**을 사용한다. Proxy 실패 시 direct로 묵시적 전환하지 않는다.

@@ -14,6 +14,7 @@ import type {
   WritingMode,
 } from "@threadflow-os/contracts";
 import type { WorkflowSnapshot } from "./workflow-store.js";
+import type { ApprovalSnapshot } from "./manual-handoff.js";
 
 export type StoredDraft = {
   id: string;
@@ -26,6 +27,7 @@ export type StoredDraft = {
   createdAt: string;
   updatedAt: string;
   parentVersion: number | null;
+  approvalSnapshot?: ApprovalSnapshot | null;
 };
 
 export type GenerationMeta = {

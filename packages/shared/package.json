@@ -10,7 +10,9 @@
   ],
   "exports": {
     ".": "./dist/index.js",
-    "./diff": "./dist/diff.js"
+    "./diff": "./dist/diff.js",
+    "./fingerprint": "./dist/fingerprint.js",
+    "./runtime-security": "./dist/runtime-security.js"
   },
   "scripts": {
     "build": "tsc -b",

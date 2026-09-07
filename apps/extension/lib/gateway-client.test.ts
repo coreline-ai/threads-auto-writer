@@ -40,21 +40,25 @@ describe("GatewayClient generation single-flight", () => {
       resolveFirst = resolve;
     });
     let generationCalls = 0;
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/v1/session/bootstrap")) {
-        return new Response(JSON.stringify({ token: "session-token" }), {
-          status: 200,
+    const generationHeaders: Array<Record<string, string>> = [];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/v1/session/bootstrap")) {
+          return new Response(JSON.stringify({ token: "session-token" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        generationCalls += 1;
+        generationHeaders.push(init?.headers as Record<string, string>);
+        if (generationCalls === 1) return firstGeneration;
+        return new Response(JSON.stringify({ id: "generation-retry" }), {
+          status: 202,
           headers: { "content-type": "application/json" },
         });
-      }
-      generationCalls += 1;
-      if (generationCalls === 1) return firstGeneration;
-      return new Response(JSON.stringify({ id: "generation-retry" }), {
-        status: 202,
-        headers: { "content-type": "application/json" },
-      });
-    });
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new GatewayClient(
@@ -79,5 +83,64 @@ describe("GatewayClient generation single-flight", () => {
       id: "generation-retry",
     });
     expect(generationCalls).toBe(2);
+    expect(generationHeaders[0]?.["x-request-fingerprint"]).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect(generationHeaders[1]?.["x-request-fingerprint"]).toBe(
+      generationHeaders[0]?.["x-request-fingerprint"],
+    );
+    expect(generationHeaders[1]?.["idempotency-key"]).not.toBe(
+      generationHeaders[0]?.["idempotency-key"],
+    );
+  });
+
+  it("keeps the same idempotency identity across a session refresh retry", async () => {
+    let bootstrapCalls = 0;
+    const attempts: Array<Record<string, string>> = [];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/v1/session/bootstrap")) {
+          bootstrapCalls += 1;
+          return new Response(
+            JSON.stringify({ token: `session-${bootstrapCalls}` }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        attempts.push(init?.headers as Record<string, string>);
+        if (attempts.length === 1)
+          return new Response(
+            JSON.stringify({
+              error: { code: "INVALID_SESSION", message: "expired" },
+            }),
+            { status: 401, headers: { "content-type": "application/json" } },
+          );
+        return new Response(
+          JSON.stringify({ id: "generation-after-refresh" }),
+          {
+            status: 202,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new GatewayClient(
+      "http://127.0.0.1:8787",
+      async () => "bootstrap",
+    );
+    await expect(client.createGeneration(request)).resolves.toEqual({
+      id: "generation-after-refresh",
+    });
+    expect(bootstrapCalls).toBe(2);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]?.["idempotency-key"]).toBe(
+      attempts[0]?.["idempotency-key"],
+    );
+    expect(attempts[1]?.["x-request-fingerprint"]).toBe(
+      attempts[0]?.["x-request-fingerprint"],
+    );
+    expect(attempts[0]?.authorization).toBe("Bearer session-1");
+    expect(attempts[1]?.authorization).toBe("Bearer session-2");
   });
 });
