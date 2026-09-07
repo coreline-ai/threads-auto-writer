@@ -13,14 +13,11 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.85.5",
+    "@threadflow-os/client-ui": "workspace:*",
     "@threadflow-os/contracts": "workspace:*",
-    "@threadflow-os/quality-engine": "workspace:*",
-    "@threadflow-os/shared": "workspace:*",
     "@threadflow-os/threads-adapter": "workspace:*",
-    "dexie": "^4.2.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "zustand": "^5.0.8"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.0",

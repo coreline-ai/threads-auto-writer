@@ -69,30 +69,21 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.85.5
         version: 5.102.8(react@19.2.8)
+      '@threadflow-os/client-ui':
+        specifier: workspace:*
+        version: link:../../packages/client-ui
       '@threadflow-os/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@threadflow-os/quality-engine':
-        specifier: workspace:*
-        version: link:../../packages/quality-engine
-      '@threadflow-os/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@threadflow-os/threads-adapter':
         specifier: workspace:*
         version: link:../../packages/threads-adapter
-      dexie:
-        specifier: ^4.2.0
-        version: 4.4.5
       react:
         specifier: ^19.1.1
         version: 19.2.8
       react-dom:
         specifier: ^19.1.1
         version: 19.2.8(react@19.2.8)
-      zustand:
-        specifier: ^5.0.8
-        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
       '@types/chrome':
         specifier: ^0.1.0
@@ -127,6 +118,59 @@ importers:
       fastify:
         specifier: ^5.6.0
         version: 5.12.1
+
+  apps/web:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.85.5
+        version: 5.102.8(react@19.2.8)
+      '@threadflow-os/client-ui':
+        specifier: workspace:*
+        version: link:../../packages/client-ui
+      react:
+        specifier: ^19.1.1
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.1.1
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.12
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.9
+        version: 19.2.6(@types/react@19.2.18)
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)
+
+  packages/client-ui:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.85.5
+        version: 5.102.8(react@19.2.8)
+      '@threadflow-os/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@threadflow-os/quality-engine':
+        specifier: workspace:*
+        version: link:../quality-engine
+      '@threadflow-os/shared':
+        specifier: workspace:*
+        version: link:../shared
+      dexie:
+        specifier: ^4.2.0
+        version: 4.4.5
+      react:
+        specifier: ^19.1.1
+        version: 19.2.8
+      zustand:
+        specifier: ^5.0.8
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.12
+        version: 19.2.18
 
   packages/codex-provider:
     dependencies:
@@ -5820,6 +5864,20 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.13.3
       esbuild: 0.27.7
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      tsx: 4.23.13
+
+  vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13):
+    dependencies:
+      lightningcss: 1.33.0
+      picomatch: 4.0.7
+      postcss: 8.5.27
+      rolldown: 1.2.7
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 24.13.3
+      esbuild: 0.28.2
       fsevents: 2.3.3
       jiti: 2.7.0
       tsx: 4.23.13

@@ -1,10 +1,20 @@
 # 남은 수정·검증 사항
 
-기준 일자: `2026-09-05 KST`
+기준 일자: `2026-09-07 KST`
 
 ## 결론
 
-필수 기능 정확성·사용성 재검토에서 발견된 코드 결함은 수정했다. 남은 필수 항목은 실제 Threads 계정, Meta 개발자 앱, HTTPS callback 또는 사람·설치 환경이 있어야 수행할 수 있는 외부 검증이다. 상세 근거는 [필수 기능 정확성·사용성 전문가 재검토](correctness-usability-audit.md)에 있다.
+기존 정확성·사용성 재검토의 수정과 에디토리얼 스튜디오 디자인 적용을 완료했다. 별도 검증 항목은 실제 Threads 계정, Meta 개발자 앱, HTTPS callback 또는 사람·설치 환경이 있어야 수행할 수 있는 외부 검증이다. 상세 근거는 [필수 기능 정확성·사용성 전문가 재검토](correctness-usability-audit.md)에 있다.
+
+## 리디자인 후 확인한 주의점
+
+- 실제 생성에서 구조화 출력 검증 실패 1회를 관측했고 재시도는 성공했다. 실패 시 입력 보존·오류 표시를 검증했다. 원인과 재현율은 확정하지 않았으며 성공률 개선은 이번 디자인 적용 범위가 아니다.
+- 기존 숫자 근거 검사는 `글 1개`, `5개 항목` 같은 체크리스트에도 경고한다. 사실 확인 완료나 글 품질 보장으로 표시하지 않으며 검사 정책을 이번 작업에서 완화하지 않았다.
+- 웹 1440/1024/390/340px와 Extension 번들 340/520px 렌더 QA를 완료했다. Extension은 Chrome API 모의 환경의 레이아웃 검증이지 네이티브 설치/Threads 로그인 검증이 아니다.
+
+## 편의성 개선 — 구현 완료
+
+다크 테마, 화면 내 수정 요청·비교, 고정 작업 바, 새 작업·임시 초안, 보관함 검색/필터를 구현했다. [검증 결과](convenience-theme-review.md)와 [개발 계획](../dev-plan/implement_20260906_225905.md)을 따른다. 실제 모바일 키보드·브라우저 자체 확대·네이티브 Extension 설치 검증은 남아 있다. 프리셋·오류별 복구 버튼·단축키는 이번 구현 범위 밖의 후속 후보다.
 
 ## 이번 점검에서 완료한 수정
 
@@ -26,6 +36,10 @@
 | P0       | Codex Turn timeout·Provider 오류 오분류·terminal SSE 종료             | 완료 |
 | P0       | 계정 연결 해제 시 대기 Job 취소·Workspace Pause Tenant 격리           | 완료 |
 | P1       | API 성공 응답 필수 필드·Pause boolean·Companion key 내용 검증         | 완료 |
+| P0       | localhost 자체 웹과 Extension 공통 Client UI·Runtime 경계             | 완료 |
+| P0       | exact loopback 웹 Origin CORS와 웹·Gateway 한 명령 실행               | 완료 |
+| P1       | 웹 OAuth 팝업 차단 fallback, 캡처 제한 안내, 안전한 클립보드 전달     | 완료 |
+| P0       | hijacked SSE 응답의 웹 CORS 헤더 누락과 실브라우저 `Failed to fetch`  | 완료 |
 
 ## 실제 사용 전 필수 외부 Gate
 
@@ -43,6 +57,12 @@
 
 ## 수동 QA Gate
 
+- 실브라우저 전체 삭제 버튼: 데이터 삭제 위험으로 보안 승인 차단, 승인 대기. DB/테마 초기화 자동 테스트는 통과.
+- 실제 모바일 소프트 키보드·브라우저 자체 확대 (CSS 200% 모사는 통과).
+
+- 완료: localhost 웹 1280px·390px 렌더, 설정 전환, Origin CORS, Companion bootstrap
+- 완료: 실제 Chromium에서 ChatGPT Pro 연결, 1턴 생성, 후보 4개, 261/500 최종 Draft 확인
+- 완료: 최종 승인 저장, 보관함 v1, 페이지 새로고침 후 Draft 복구 확인
 - 동일 Chrome 프로필에서 Threads 로그인 후 작성창 자동 입력
 - 로그아웃 상태에서 `login-required` 표시와 클립보드 보존
 - Threads DOM이 바뀐 경우 직접 붙여넣기 fallback
@@ -73,6 +93,8 @@
 
 - TypeScript project reference typecheck: PASS
 - ESLint: PASS
-- Vitest: `79/79` PASS
+- Vitest: `125/125` PASS
+- localhost 웹 production build·실브라우저 QA: PASS
+- 웹 Origin Codex OAuth 상태·실제 Chromium 1턴 생성·승인·복구: PASS
 - WXT Chrome MV3 production build: PASS
-- Extension ZIP SHA-256: `97613edd445b569e84ac6ed9e228b5b495e7b6f183f33bdcd4e3c16fd2271c63`
+- Extension ZIP SHA-256: `3147f14befdce28c10fa60af375264a5d16ffbc826f0feeb51bf4ac21471f75e`

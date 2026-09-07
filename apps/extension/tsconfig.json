@@ -17,9 +17,8 @@
     "wxt.config.ts"
   ],
   "references": [
+    { "path": "../../packages/client-ui" },
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/quality-engine" },
-    { "path": "../../packages/shared" },
     { "path": "../../packages/threads-adapter" }
   ]
 }

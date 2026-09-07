@@ -18,4 +18,6 @@ data/
 *.sqlite-wal
 apps/extension/.output/
 release/
+.playwright-cli/
+output/playwright/
 .DS_Store

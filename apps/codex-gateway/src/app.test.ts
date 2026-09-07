@@ -10,6 +10,10 @@ const headers = { host: `127.0.0.1:${port}`, origin };
 class FakeProvider implements GatewayProvider {
   closed = false;
   authenticated = true;
+  revisionPrompts: string[] = [];
+  revisionResult: () => Promise<unknown> = async () => ({
+    text: "수정된 최종 글입니다.",
+  });
 
   constructor(private readonly blockGeneration = false) {}
   async initialize() {}
@@ -53,7 +57,10 @@ class FakeProvider implements GatewayProvider {
     return {
       threadId: () => "thread-1",
       close: async () => undefined,
-      revise: async () => ({ text: "수정된 최종 글입니다." }),
+      revise: async (_thread, prompt) => {
+        this.revisionPrompts.push(prompt);
+        return this.revisionResult();
+      },
       generateJson: async ({ stage }) => {
         if (stage === "ANALYZING")
           return {
@@ -189,7 +196,7 @@ describe("localhost gateway security", () => {
   });
 
   it("returns normalized auth status and completes a generation job", async () => {
-    const { app, authorized } = await setup();
+    const { app, authorized, provider } = await setup();
     const auth = await app.inject({
       method: "GET",
       url: "/v1/auth/status",
@@ -249,7 +256,83 @@ describe("localhost gateway security", () => {
       headers: authorized,
     });
     expect(replayedEvents.statusCode).toBe(200);
+    expect(replayedEvents.headers["access-control-allow-origin"]).toBe(origin);
     expect(replayedEvents.body).toContain('"state":"COMPLETED"');
+    const previewInput = {
+      scope: "full",
+      feedback: "더 선명하게",
+      baseText: "사람이 직접 편집한 최신 본문",
+      preview: true,
+    };
+    const preview = await app.inject({
+      method: "POST",
+      url: `/v1/generations/${id}/revisions`,
+      headers: authorized,
+      payload: previewInput,
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(provider.revisionPrompts.at(-1)).toContain(previewInput.baseText);
+    const unchanged = await app.inject({
+      method: "GET",
+      url: `/v1/generations/${id}`,
+      headers: authorized,
+    });
+    expect(unchanged.json().result).toEqual(result.json().result);
+    for (const invalid of [
+      { ...previewInput, baseText: "" },
+      { ...previewInput, baseText: undefined },
+      { ...previewInput, feedback: 3 },
+      { ...previewInput, preview: "yes" },
+    ]) {
+      expect(
+        (
+          await app.inject({
+            method: "POST",
+            url: `/v1/generations/${id}/revisions`,
+            headers: authorized,
+            payload: invalid,
+          })
+        ).statusCode,
+      ).toBe(400);
+    }
+    let release!: (value: unknown) => void;
+    provider.revisionResult = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    const pending = app
+      .inject({
+        method: "POST",
+        url: `/v1/generations/${id}/revisions`,
+        headers: authorized,
+        payload: previewInput,
+      })
+      .then((value) => value);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/generations/${id}/revisions`,
+          headers: authorized,
+          payload: previewInput,
+        })
+      ).statusCode,
+    ).toBe(409);
+    release({ text: "동시성 검사 수정안" });
+    await pending;
+    provider.revisionResult = async () => ({ text: "" });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/generations/${id}/revisions`,
+          headers: authorized,
+          payload: previewInput,
+        })
+      ).statusCode,
+    ).toBe(502);
+    provider.revisionResult = async () => ({ text: "수정된 최종 글입니다." });
     const revised = await app.inject({
       method: "POST",
       url: `/v1/generations/${id}/revisions`,

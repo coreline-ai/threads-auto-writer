@@ -6,32 +6,20 @@ import {
 } from "@threadflow-os/codex-provider";
 import { loadOrCreateSecret } from "@threadflow-os/shared";
 import { buildGateway } from "./app.js";
+import { parseAllowedClientOrigins } from "./origins.js";
 
 const root = resolve(process.env.THREADFLOW_DATA_ROOT ?? process.cwd());
 const host = process.env.THREADFLOW_HOST ?? "127.0.0.1";
 const port = Number(process.env.THREADFLOW_PORT ?? 8787);
-const allowedOrigins = (process.env.THREADFLOW_EXTENSION_ORIGINS ?? "")
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
+const allowedOrigins = parseAllowedClientOrigins(
+  process.env.THREADFLOW_EXTENSION_ORIGINS,
+  process.env.THREADFLOW_WEB_ORIGINS,
+);
 
 if (host !== "127.0.0.1" && host !== "::1")
   throw new Error("ThreadFlow Gateway must bind to loopback only");
 if (!Number.isInteger(port) || port < 1 || port > 65_535)
   throw new Error("THREADFLOW_PORT must be an integer between 1 and 65535");
-if (!allowedOrigins.length)
-  throw new Error(
-    "THREADFLOW_EXTENSION_ORIGINS must contain the installed extension origin",
-  );
-if (
-  allowedOrigins.some(
-    (origin) => !/^chrome-extension:\/\/[a-p]{32}$/.test(origin),
-  )
-)
-  throw new Error(
-    "THREADFLOW_EXTENSION_ORIGINS must contain only Chrome extension origins",
-  );
-
 const secretPath = resolve(
   root,
   process.env.THREADFLOW_SESSION_SECRET_FILE ?? ".threadflow/session-secret",
@@ -64,7 +52,7 @@ try {
   );
   process.stdout.write(`Companion key file: ${secretPath}\n`);
   process.stdout.write(
-    "Paste the file contents, not the file path, into the Side Panel settings.\n",
+    "Paste the file contents, not the file path, into the app settings.\n",
   );
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {

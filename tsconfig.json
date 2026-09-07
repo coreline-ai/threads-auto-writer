@@ -9,8 +9,10 @@
     { "path": "packages/threads-adapter" },
     { "path": "packages/database" },
     { "path": "packages/threads-client" },
+    { "path": "packages/client-ui" },
     { "path": "apps/codex-gateway" },
     { "path": "apps/scheduler-server" },
+    { "path": "apps/web" },
     { "path": "apps/extension" }
   ]
 }

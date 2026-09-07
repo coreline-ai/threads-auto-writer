@@ -10,7 +10,10 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
+    "build:web": "pnpm --filter @threadflow-os/web build",
     "dev:gateway": "pnpm --filter @threadflow-os/codex-gateway dev",
+    "dev:web": "pnpm --filter @threadflow-os/web dev",
+    "start:web": "node scripts/start-web-mode.mjs",
     "start:developer": "node scripts/start-developer-mode.mjs",
     "dev:scheduler": "pnpm --filter @threadflow-os/scheduler-server dev",
     "dev:extension": "pnpm --filter @threadflow-os/extension dev",

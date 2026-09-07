@@ -273,3 +273,20 @@ export function countThreadsTextUnits(text: string): number {
   }
   return units;
 }
+
+export const RevisionRequestSchema = z
+  .object({
+    scope: z.enum(["hook", "cta", "full"]),
+    feedback: z.string().trim().min(1).max(2_000),
+    baseText: z
+      .string()
+      .min(1)
+      .max(30_000)
+      .refine((value) => value.trim().length > 0)
+      .optional(),
+    preview: z.boolean().default(false),
+  })
+  .refine((value) => !value.preview || value.baseText !== undefined, {
+    message: "Preview requires the current editor text",
+  });
+export type RevisionRequest = z.infer<typeof RevisionRequestSchema>;

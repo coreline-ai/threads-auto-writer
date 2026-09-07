@@ -1,13 +1,35 @@
 # ThreadFlow OS GUI 시안 대 코드 정밀 감사
 
+## 최신 디자인 적용 검증 — 2026-09-06
+
+기존 세로형 래스터 시안의 픽셀 복제가 아니라, 승인된 **에디토리얼 스튜디오** 방향으로 의도적으로 재설계했다. 아래 과거 감사의 520px/21px Radius/그라디언트/주관적 점수는 현재 UI 판정 기준이 아니다.
+
+| 검증                    | 실제 결과                                                    |
+| ----------------------- | ------------------------------------------------------------ |
+| 1440px 웹               | 탐색 184px, 요청 320px, 결과 848px, 편집 입력 최대 720px     |
+| 1024px 웹               | 수평 탐색, 요청 320px + 결과 616px                           |
+| 390px / 340px 웹        | 한 열 366px / 316px, 가로 넘침 없음                          |
+| Extension 340px / 520px | production 번들 + Chrome API 모의 렌더, 한 열·캡처 버튼 확인 |
+| 폼/상태                 | 문체·근거 펼침, 실패·완료, 승인 전 전달 차단, 편집 후 재승인 |
+| 기타 화면               | 보관함·캘린더·설정 340px/1024px 넘침 없음                    |
+| 회귀                    | 17 files / 94 tests, TypeScript·ESLint·웹/확장 build PASS    |
+
+[디자인 명세와 실제 화면](editorial-studio-design.md), [개발 계획](../dev-plan/implement_20260906_214210.md)을 정본으로 사용한다. 실제 게시 및 Extension의 네이티브 설치·로그인 DOM은 이번 레이아웃 검증에 포함되지 않는다.
+
+## 과거 감사 기록 (아래 수치·일치도는 당시 기준)
+
+> **1턴 UX 반영:** 작성 화면은 이후 `참고 자료`와 `작성 전략`을 하나의 **한 번에 Threads 글 완성** 카드로 통합했다. 기본 화면에는 단일 입력, 빠른 모드, `1턴으로 완성하기` CTA만 노출하고 URL·Persona·근거·후보 수는 펼침형 세부 설정으로 이동했다. 후보 비교도 선택형으로 접어 두며, 완성된 최종 글과 게시 전 승인 단계는 유지한다. 기존 시안의 색상·폭·타이포·접근성 토큰은 그대로 적용된다.
+
 ## 1. 감사 범위와 결론
 
 - 시안 원본: `docs/assets/threadflow-write-ui-concept.png`
 - 시안 해상도: 887 × 1774 px
-- 구현 대상: Chrome Extension Side Panel의 `작성` 첫 화면
+- 구현 대상: 웹·Chrome Extension 공통 `작성` 화면과 웹 전용 진입 Shell
 - 코드 기준:
-  - `apps/extension/entrypoints/sidepanel/App.tsx`
-  - `apps/extension/entrypoints/sidepanel/style.css`
+  - `packages/client-ui/src/App.tsx`
+  - `packages/client-ui/src/style.css`
+  - `apps/web/src/main.tsx`
+  - `apps/web/src/web.css`
 - 검증 방식: 시안의 상대 비율 분석, JSX 구조 대조, CSS 토큰 대조, 로컬 production build 브라우저 렌더 확인
 
 결론적으로 화면 구조와 정보 우선순위는 시안과 일치한다. 이번 감사에서 아이콘, 상태 점, 입력 컨트롤, 카드 밀도, 타이포그래피, 포커스 상태와 좁은 Side Panel 대응을 보완했다. 생성형 시안이 단순화한 입력 방식은 그대로 복제하지 않고 실제 제품 기능을 보존했다.
@@ -82,12 +104,12 @@
 
 ## 6. 구현 변경 위치
 
-- `App.tsx`
+- `packages/client-ui/src/App.tsx`
   - 재사용 가능한 `UiIcon` SVG 컴포넌트 추가
   - 상태 Pill 점, 탭 아이콘, 필드 아이콘, CTA 아이콘 추가
   - 활성 탭에 `aria-current="page"` 적용
   - 실제 Range Slider와 다중 근거 Textarea 기능 유지
-- `style.css`
+- `packages/client-ui/src/style.css`
   - 색상·Surface 토큰 도입
   - Side Panel용 520px Shell과 400px 이하 반응형 규칙 보정
   - 카드·탭·입력·CTA 비율 및 시각 상태 보정
@@ -98,11 +120,12 @@
 - Prettier: 통과
 - TypeScript project build: 통과
 - ESLint: 통과
-- Vitest: 15개 파일, 79/79 통과
+- Vitest: 16개 파일, 85/85 통과
+- localhost 웹 production build와 1280px·390px 실제 Chromium 렌더: 통과
 - WXT Chrome MV3 production build: 통과
 - Extension ZIP 생성: 통과
-- 로컬 브라우저 렌더: 헤더, 탭, 01/02 카드, 입력 컨트롤 표시 확인
-- Extension ZIP SHA-256: `97613edd445b569e84ac6ed9e228b5b495e7b6f183f33bdcd4e3c16fd2271c63`
+- 로컬 브라우저 렌더: 헤더, 탭, 1 TURN 카드, 빠른 모드, 세부 설정 펼침과 CTA 활성화 확인
+- Extension ZIP SHA-256: `bcf987ee5ce1ef0f47bfaff95dfedb32c6773b0d3c7b3e320b2284285385ebb6`
 
 ## 8. 아직 필요한 실제 환경 확인
 
@@ -116,3 +139,7 @@
 - 키보드만 사용한 탭 이동과 Focus 순서
 
 실제 Threads 로그인·작성창은 이 앱 시안 감사 범위가 아니며, 로그인 계정이 준비된 Chrome 프로필에서 별도 E2E가 필요하다.
+
+## 2026-09-07 후속 적용
+
+Forest Night와 편의 기능을 구현했다. 앞선 수치는 이전 리디자인의 기준선이며, 최신 결과는 **125개 테스트 PASS**와 [편의성·테마 검토](convenience-theme-review.md)를 기준으로 한다. 확장 번들 렌더 QA와 실제 네이티브 설치 QA는 구분한다.

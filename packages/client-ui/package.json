@@ -1,0 +1,47 @@
+{
+  "name": "@threadflow-os/client-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src/style.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./database": {
+      "types": "./dist/database.d.ts",
+      "default": "./dist/database.js"
+    },
+    "./gateway-client": {
+      "types": "./dist/gateway-client.d.ts",
+      "default": "./dist/gateway-client.js"
+    },
+    "./workflow-store": {
+      "types": "./dist/workflow-store.d.ts",
+      "default": "./dist/workflow-store.js"
+    },
+    "./style.css": "./src/style.css"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.85.5",
+    "@threadflow-os/contracts": "workspace:*",
+    "@threadflow-os/quality-engine": "workspace:*",
+    "@threadflow-os/shared": "workspace:*",
+    "dexie": "^4.2.0",
+    "react": "^19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12"
+  }
+}

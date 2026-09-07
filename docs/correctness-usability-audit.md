@@ -1,10 +1,12 @@
 # 필수 기능 정확성·사용성 전문가 재검토
 
-기준 일시: `2026-09-05 KST`
+> 최신 UI 검증은 [에디토리얼 스튜디오](editorial-studio-design.md)를 따른다. 아래 감사는 당시 85개 테스트 기준 기록이다. 현재 전체 테스트는 94개이며 최신 설치물 hash는 [출시 준비 상태](release-readiness.md)에 있다.
+
+기준 일시: `2026-09-06 KST`
 
 ## 결론
 
-이번 검토는 기능 확장이 아니라 **현재 약속한 작성·검수·승인·전달·예약 경로가 틀리지 않고, 사용자가 실수해도 복구 가능한지**만 확인했다. 코드 수준에서 확인된 P0/P1 결함은 수정했고 TypeScript, ESLint, Vitest `79/79`, Chrome MV3 Production build를 통과했다.
+이번 검토는 기능 확장이 아니라 **현재 약속한 작성·검수·승인·전달·예약 경로가 틀리지 않고, 사용자가 실수해도 복구 가능한지**만 확인했다. 코드 수준에서 확인된 P0/P1 결함은 수정했고 TypeScript, ESLint, Vitest `85/85`, 자체 웹과 Chrome MV3 Production build를 통과했다.
 
 실제 Threads DOM과 Meta 실계정 API는 자격 증명·로그인 환경이 있어야 확인할 수 있으므로 완료로 과장하지 않는다. 이 항목들은 코드 누락이 아니라 마지막 실환경 Gate다.
 
@@ -25,10 +27,12 @@
 | Tenant 격리      | 한 Workspace의 전체 Pause가 다른 Tenant까지 멈출 수 있고 Account ID 충돌 시 타 Tenant Token 갱신 가능성               | Workspace 범위 Pause와 Account ID 소유권 조건을 적용                                                                      | 완료 |
 | Threads API 응답 | 성공 HTTP에 필수 `id`/`access_token`이 없어도 성공으로 취급                                                           | Token, Profile, Container, Publish 응답을 런타임 검증하고 불명확한 게시 결과는 재시도 금지                                | 완료 |
 | 연결 안내        | UI placeholder와 문서가 `session-secret` 파일 경로를 붙여넣는 것으로 오해될 수 있음                                   | **경로가 아니라 파일 내용**을 입력하도록 UI·Gateway 출력·설치 문서 수정                                                   | 완료 |
+| 웹 우선 실행     | Extension 설치 전에는 핵심 작성 기능을 실행할 독립 Surface가 없음                                                     | 공통 Client UI와 Runtime Adapter를 분리하고 localhost 웹·명시적 loopback CORS·팝업 차단 fallback 구현                     | 완료 |
+| 웹 SSE 수신      | Fastify raw SSE 응답에 CORS 헤더가 없어 실제 Chromium 1턴이 `Failed to fetch`로 종료                                  | 검증된 요청 Origin과 `Vary: Origin`을 raw 응답에 복원하고 응답 헤더 회귀 테스트 추가                                      | 완료 |
 
 ## 핵심 사용자 흐름 재확인
 
-1. 사용자가 Threads 게시물에서 Side Panel 캡처 또는 직접 붙여넣기를 선택한다.
+1. 사용자가 웹에 주제·메모를 직접 입력하거나 Extension에서 Threads 게시물을 캡처한다.
 2. 제출 전에 URL·Source·Persona·목적·근거 개수와 길이를 검사한다.
 3. Codex 작업은 read-only·tool-free Thread에서 실행하고 단계별 결과를 SSE로 전달한다.
 4. 후보·최종안은 결정적 유사도, 근거, 금지 표현, 제휴 고지, 500-unit 한도를 다시 검사한다.
@@ -40,12 +44,16 @@
 
 - TypeScript project reference: PASS
 - ESLint: PASS
-- Vitest: `15 files / 79 tests` PASS
+- Vitest: `16 files / 85 tests` PASS
+- localhost 웹 production build, 1280px·390px 실브라우저 렌더: PASS
+- 웹 Origin CORS·Companion bootstrap·Codex OAuth(`chatgpt`, Pro) 실제 연결: PASS
+- 실제 Chromium 1턴 생성·후보 4개·261/500 최종 Draft·위험 검사: PASS
+- 최종 승인 저장·보관함 v1·페이지 새로고침 복구: PASS
 - WXT Chrome MV3 Production build·ZIP: PASS
 - Developer-mode Gateway bind·`/v1/health` Smoke: PASS
 - Golden Set `30/30`, 성능 예산 Smoke: PASS
-- Extension ZIP SHA-256: `97613edd445b569e84ac6ed9e228b5b495e7b6f183f33bdcd4e3c16fd2271c63`
-- Companion tar.gz SHA-256: `687c7960ced20422142181af8cbfae368ab35e4e82720c05aae9647abb08f919`
+- Extension ZIP SHA-256: `bcf987ee5ce1ef0f47bfaff95dfedb32c6773b0d3c7b3e320b2284285385ebb6`
+- Companion tar.gz SHA-256: `7366f1f3c5620da8c65cd8f1819def83f51766e64d7e5e0bd1929e62acd77f45`
 
 ## 남은 실환경 Gate
 
@@ -65,3 +73,7 @@
 - 결제·외부 IdP·알림 대시보드
 
 위 항목은 현재 필수 정확성 수정이 아니라 별도 제품 확장이다.
+
+## 2026-09-07 후속 적용
+
+Forest Night와 편의 기능을 구현했다. 앞선 수치는 이전 리디자인의 기준선이며, 최신 결과는 **125개 테스트 PASS**와 [편의성·테마 검토](convenience-theme-review.md)를 기준으로 한다. 확장 번들 렌더 QA와 실제 네이티브 설치 QA는 구분한다.

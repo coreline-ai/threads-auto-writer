@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import {
   GenerationRequestSchema,
+  type RevisionRequest,
   type ApiErrorCode,
   type GenerationEvent,
   type GenerationRequest,
@@ -35,6 +36,7 @@ type Job = GenerationSnapshot & {
   events: GenerationEvent[];
   bus: EventEmitter;
   provider: GenerationProviderSession;
+  revisionBusy?: boolean;
 };
 
 export class GenerationManager {
@@ -109,46 +111,61 @@ export class GenerationManager {
     return true;
   }
 
-  async revise(
-    id: string,
-    input: { feedback: string; scope: "hook" | "cta" | "full" },
-  ): Promise<PipelineResult> {
+  async revise(id: string, input: RevisionRequest): Promise<PipelineResult> {
     const job = this.#jobs.get(id);
     const threadId = job?.provider.threadId();
-    if (!job?.result || !threadId || !job.provider.revise)
+    if (
+      !job?.result ||
+      job.state !== "COMPLETED" ||
+      !threadId ||
+      !job.provider.revise
+    )
       throw new Error("NOT_REVISION_READY");
-    const output = (await job.provider.revise(
-      threadId,
-      buildRevisionPrompt(
-        job.result.finalDraft.text,
-        input.feedback,
-        input.scope,
-      ),
-      {
-        type: "object",
-        additionalProperties: false,
-        required: ["text"],
-        properties: { text: { type: "string" } },
-      },
-      job.abort.signal,
-    )) as { text?: unknown };
-    if (typeof output.text !== "string" || !output.text.trim())
-      throw new Error("INVALID_OUTPUT");
-    const flags = deterministicFlags(job.request, output.text);
-    job.result = {
-      ...job.result,
-      finalDraft: {
-        ...job.result.finalDraft,
-        text: output.text,
-        riskFlags: flags,
-        approvalStatus: flags.some((flag) => flag.severity === "blocking")
-          ? "REVIEW_REQUIRED"
-          : "DRAFT",
-        approvedAt: null,
-      },
-    };
-    job.updatedAt = nowIso();
-    return job.result;
+    if (job.revisionBusy) throw new Error("REVISION_BUSY");
+    job.revisionBusy = true;
+    try {
+      const output = (await job.provider.revise(
+        threadId,
+        buildRevisionPrompt(
+          input.baseText ?? job.result.finalDraft.text,
+          input.feedback,
+          input.scope,
+        ),
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["text"],
+          properties: { text: { type: "string" } },
+        },
+        job.abort.signal,
+      )) as { text?: unknown };
+      if (
+        typeof output.text !== "string" ||
+        !output.text.trim() ||
+        output.text.length > 30_000
+      )
+        throw new Error("INVALID_OUTPUT");
+      const flags = deterministicFlags(job.request, output.text);
+      const result: PipelineResult = {
+        ...job.result,
+        finalDraft: {
+          ...job.result.finalDraft,
+          text: output.text,
+          riskFlags: flags,
+          approvalStatus: flags.some((flag) => flag.severity === "blocking")
+            ? "REVIEW_REQUIRED"
+            : "DRAFT",
+          approvedAt: null,
+        },
+      };
+      if (!input.preview) {
+        job.result = result;
+        job.updatedAt = nowIso();
+      }
+      return result;
+    } finally {
+      job.revisionBusy = false;
+    }
   }
 
   private async run(job: Job): Promise<void> {

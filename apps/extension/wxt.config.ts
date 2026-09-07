@@ -1,6 +1,7 @@
 import { defineConfig } from "wxt";
 
 export default defineConfig({
+  publicDir: "../../packages/client-ui/public",
   srcDir: ".",
   manifest: {
     name: "ThreadFlow OS",

@@ -1,0 +1,116 @@
+/* Desktop layout belongs to the web runtime; Extension remains one column. */
+@media (min-width: 960px) {
+  .shell-web {
+    width: 100%;
+    padding: 0;
+  }
+  .shell-web .topbar {
+    min-height: 72px;
+    margin: 0;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .shell-web .navigation {
+    padding: 16px 32px 0;
+  }
+  .shell-web .tabs {
+    display: flex;
+    margin: 0;
+    border: 0;
+    padding: 0;
+  }
+  .shell-web .tabs button {
+    padding-inline: 20px;
+  }
+  .shell-web .workspace-content {
+    padding: 32px;
+  }
+  .shell-web .writer-layout {
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 24px;
+  }
+  .shell-web .one-turn-card {
+    padding: 24px;
+    position: sticky;
+    top: 24px;
+  }
+  .shell-web .editor-card {
+    padding: 28px;
+  }
+  .shell-web .editor-card > :not(.section-title),
+  .shell-web .editor-empty > :not(.section-title) {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+  .shell-web .workspace-content > .card {
+    max-width: 960px;
+  }
+  .shell-web .workspace-content > .settings {
+    max-width: 720px;
+  }
+}
+@media (min-width: 1200px) {
+  .shell-web {
+    display: grid;
+    grid-template-columns: 184px minmax(0, 1fr);
+    grid-template-rows: 72px minmax(0, 1fr);
+  }
+  .shell-web .topbar {
+    grid-column: 1 / -1;
+    padding-inline: 24px 32px;
+  }
+  .shell-web .navigation {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+    position: sticky;
+    top: 0;
+    min-height: calc(100vh - 72px);
+    padding: 32px 16px 24px;
+    border-right: 1px solid var(--line);
+  }
+  .shell-web .nav-label {
+    display: block;
+    margin: 0 12px 16px;
+    font:
+      600 10px/1.5 "Avenir Next",
+      sans-serif;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+  }
+  .shell-web .tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .shell-web .tabs button {
+    justify-content: flex-start;
+    padding: 12px;
+  }
+  .shell-web .tabs button:last-child {
+    margin-top: 20px;
+  }
+  .shell-web .nav-footer {
+    display: block;
+    margin: auto 12px 0;
+    padding-top: 48px;
+  }
+  .shell-web .nav-footer p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+    margin: 8px 0 0;
+  }
+  .shell-web .workspace-content {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding: 36px 32px 48px;
+  }
+  .shell-web .workspace-caption {
+    display: block;
+  }
+}

@@ -2,9 +2,28 @@
 
 ## 결론
 
-현재 개인용 Chrome 개발자 모드에서 직접 입력하는 외부 값은 **Chrome Extension ID 하나**다. 다만 AI 생성을 위한 ChatGPT OAuth 로그인과 작성창 전달을 위한 Threads 웹 로그인이 각각 필요하다. LLM API Key, Meta App 값, Apple 인증서는 필요하지 않다. 웹 로그인과 Meta 개발자 OAuth의 차이·획득 절차는 [Threads 웹 로그인·Meta OAuth 설정 가이드](threads-auth-setup.md)를 따른다.
+현재 개인용 자체 웹 실행에는 직접 발급받아 입력할 외부 값이 없다. AI 생성을 위한 ChatGPT OAuth 로그인과 로컬에서 자동 생성되는 Companion 연결 키만 필요하다. Chrome Extension을 추가할 때는 Chrome이 표시하는 **Extension ID 하나**가 필요하고, 작성창 자동 입력 시에는 Threads 웹 로그인도 필요하다. LLM API Key, Meta App 값, Apple 인증서는 필요하지 않다. 웹 로그인과 Meta 개발자 OAuth의 차이·획득 절차는 [Threads 웹 로그인·Meta OAuth 설정 가이드](threads-auth-setup.md)를 따른다.
 
-## 1. 현재 개인 개발자 모드
+## 1. 자체 웹 모드
+
+| 값                        | 필요         | 출처                                     | 비고                                       |
+| ------------------------- | ------------ | ---------------------------------------- | ------------------------------------------ |
+| ChatGPT OAuth 로그인 상태 | 필수         | 웹 앱의 **ChatGPT 구독으로 로그인**      | API Key가 아니라 사용자 구독 로그인        |
+| Companion 연결 키         | 자동 생성    | `.threadflow/session-secret` 파일의 내용 | 경로가 아닌 키 문자열을 웹 설정에 입력     |
+| LLM API Key               | 불필요       | 해당 없음                                | Codex OAuth Provider Proxy 사용            |
+| Meta App ID/Secret        | 불필요       | 해당 없음                                | Threads 자동 게시 API를 사용하지 않음      |
+| Threads 웹 로그인         | 전달 시 선택 | `threads.com`                            | 웹은 Threads를 열고 사용자가 직접 붙여넣음 |
+| Apple 인증서·서명         | 불필요       | 해당 없음                                | 로컬 Node/Terminal 실행에는 불필요         |
+
+실행 명령:
+
+```bash
+pnpm start:web
+```
+
+Gateway 실행 후 `cat .threadflow/session-secret`로 확인한 **파일 내용**을 웹 설정에 붙여넣는다. `.threadflow/session-secret`라는 경로 자체를 입력하지 않는다.
+
+## 2. Chrome Extension 개발자 모드
 
 | 값                        | 필요         | 출처                                                              | 비고                                          |
 | ------------------------- | ------------ | ----------------------------------------------------------------- | --------------------------------------------- |
@@ -16,7 +35,7 @@
 | Meta App ID/Secret        | 불필요       | 해당 없음                                                         | Threads 기본 작성·예약 UI를 사용하므로 불필요 |
 | Apple 인증서·서명         | 불필요       | 해당 없음                                                         | 로컬 Node/Terminal 실행에는 불필요            |
 
-실행 명령:
+Extension 실행 명령:
 
 ```bash
 pnpm start:developer -- <chrome-extension-id>
@@ -26,7 +45,7 @@ Gateway 실행 후 `cat .threadflow/session-secret`로 확인한 **파일 내용
 
 Threads 웹에 로그인하지 않은 경우 Extension은 로그인 화면을 열고 초안을 클립보드에 보존하지만 작성창 입력 성공으로 표시하지 않는다. 로그인 후 직접 붙여넣거나 다시 전달해야 한다.
 
-## 2. Phase 8 공식 Threads API 자동 게시를 켤 때만 필요한 값
+## 3. Phase 8 공식 Threads API 자동 게시를 켤 때만 필요한 값
 
 | 환경 변수                    | 분류           | 생성·획득 위치                                                                      |
 | ---------------------------- | -------------- | ----------------------------------------------------------------------------------- |
@@ -53,7 +72,7 @@ openssl rand -hex 32
 
 중요: Meta 공식 sample 기준으로 Threads OAuth는 `localhost` redirect를 지원하지 않고 HTTPS를 요구한다. 공개 HTTPS 터널/Reverse Proxy 또는 사용자 지정 로컬 호스트+신뢰 인증서를 사용해야 하며 `http://127.0.0.1:8788/...`는 실제 OAuth callback으로 사용할 수 없다.
 
-## 3. Apple 서명이 필요한 경우
+## 4. Apple 서명이 필요한 경우
 
 Apple Developer ID 서명과 공증은 ThreadFlow OS를 `.app`, `.pkg` 같은 일반 사용자용 macOS 설치물로 외부 배포할 때 Gatekeeper 신뢰 경고를 줄이기 위한 절차다.
 

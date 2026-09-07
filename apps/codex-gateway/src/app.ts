@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import {
   GenerationRequestSchema,
+  RevisionRequestSchema,
   type AuthStatus,
 } from "@threadflow-os/contracts";
 import type { CodexProviderAdapter } from "@threadflow-os/codex-provider";
@@ -85,7 +86,7 @@ export async function buildGateway(
         reply,
         403,
         "INVALID_ORIGIN",
-        "허용되지 않은 Extension Origin입니다.",
+        "허용되지 않은 클라이언트 Origin입니다.",
       );
   });
 
@@ -161,12 +162,7 @@ export async function buildGateway(
       );
     const auth = await config.provider.getAuthStatus();
     if (!auth.authenticated)
-      return reject(
-        reply,
-        401,
-        "AUTH_REQUIRED",
-        "Codex 로그인이 필요합니다.",
-      );
+      return reject(reply, 401, "AUTH_REQUIRED", "Codex 로그인이 필요합니다.");
     return reply.code(202).send(manager.create(parsed.data));
   });
 
@@ -183,11 +179,14 @@ export async function buildGateway(
     const existing = manager.events(id);
     if (!existing)
       return reject(reply, 404, "NOT_FOUND", "생성 작업을 찾을 수 없습니다.");
+    const origin = requestOrigin(request)!;
     reply.hijack();
     reply.raw.writeHead(200, {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-cache, no-transform",
       connection: "keep-alive",
+      vary: "Origin",
+      "access-control-allow-origin": origin,
       "x-accel-buffering": "no",
     });
     let cursor = 0;
@@ -227,21 +226,15 @@ export async function buildGateway(
   });
 
   app.post("/v1/generations/:id/revisions", async (request, reply) => {
-    const body = (request.body ?? {}) as {
-      feedback?: string;
-      scope?: "hook" | "cta" | "full";
-    };
-    if (
-      !body.feedback?.trim() ||
-      !body.scope ||
-      !["hook", "cta", "full"].includes(body.scope)
-    )
+    const parsed = RevisionRequestSchema.safeParse(request.body);
+    if (!parsed.success)
       return reject(
         reply,
         400,
         "INVALID_REQUEST",
-        "수정 범위와 피드백이 필요합니다.",
+        "수정 범위·피드백·기준 본문을 확인하세요.",
       );
+    const body = parsed.data;
     try {
       const auth = await config.provider.getAuthStatus();
       if (!auth.authenticated)
@@ -251,17 +244,21 @@ export async function buildGateway(
           "AUTH_REQUIRED",
           "Codex 로그인이 필요합니다.",
         );
-      return await manager.revise((request.params as { id: string }).id, {
-        feedback: body.feedback.slice(0, 2_000),
-        scope: body.scope,
-      });
+      return await manager.revise((request.params as { id: string }).id, body);
     } catch (error) {
+      if (error instanceof Error && error.message === "REVISION_BUSY")
+        return reject(
+          reply,
+          409,
+          "REVISION_BUSY",
+          "수정 작업이 이미 진행 중입니다.",
+        );
       if (error instanceof Error && error.message === "NOT_REVISION_READY")
         return reject(
           reply,
           409,
           "NOT_REVISION_READY",
-          "완료된 생성 작업만 수정할 수 있습니다.",
+          "수정할 생성 문맥이 없거나 만료됐습니다. 현재 글을 보존하고 새로 생성해 주세요.",
         );
       throw error;
     }

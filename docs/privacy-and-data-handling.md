@@ -9,8 +9,8 @@
 
 ## 저장 위치
 
-- Extension 데이터와 마지막 미승인 작업공간은 Draft 유실 방지를 위해 사용자의 IndexedDB에 자동 저장된다.
-- Codex OAuth Access/Refresh Token은 Extension, IndexedDB, Export, ThreadFlow Scheduler에 저장되지 않는다.
+- 웹과 Extension 데이터 및 마지막 미승인 작업공간은 Draft 유실 방지를 위해 각 브라우저 Origin의 IndexedDB에 자동 저장된다.
+- Codex OAuth Access/Refresh Token은 웹, Extension, IndexedDB, Export, ThreadFlow Scheduler에 저장되지 않는다.
 - Codex 인증은 로컬 Codex App Server가 관리한다.
 - 공식 Threads API 자동 게시를 켠 경우 Threads Token은 서버에서 AES-256-GCM으로 암호화하며 Tenant와 계정 ID를 Associated Data로 사용한다.
 
@@ -31,3 +31,7 @@
 - 로컬 데이터 Export와 전체 삭제를 제공한다.
 - Threads 연결 해제 시 암호화 Token을 제거하고 계정을 Pause하며 아직 시작하지 않은 예약 Job을 취소한다.
 - SaaS 사용자 삭제는 해당 사용자의 Token, Draft, Job, Insights, 편집 파생 데이터, 감사 로그를 삭제한다.
+
+## 2026-09-07 로컬 작업 저장 보완
+
+DB v4의 workingDrafts에 입력·근거·후보·본문·편집 이력·이미지 메타데이터를 보관하며 이전 current snapshot은 복구용으로 유지한다. 테마 선호는 별도 localStorage에 저장한다. Export에는 미저장 currentRecovery를 포함하고 Companion 연결 키는 제외한다. 전체 삭제는 신규 작업 테이블과 이전 백업, 테마 선호를 함께 제거한다. 이미지 파일 원본은 저장·전송하지 않는다.
