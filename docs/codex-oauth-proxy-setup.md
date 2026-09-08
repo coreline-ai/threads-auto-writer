@@ -96,4 +96,4 @@ THREADFLOW_CODEX_PROVIDER=direct pnpm start:web
 
 - 저장소 자동 테스트는 URL·권한·caller 헤더·capability·timeout·취소·오류 마스킹·DLP를 mock Proxy로 검증한다.
 - 실 Proxy의 실행 주소·caller secret·OAuth 세션이 없으면 실제 구독 생성 테스트는 완료로 표시하지 않는다.
-- 장치 watchdog 같은 외부 운영 프로세스가 생성 중 Proxy를 재시작하면 안전하게 `PROVIDER_UNAVAILABLE`로 실패한다. POST를 자동 재전송하면 중복 turn 위험이 있으므로 ThreadFlow는 자동 재시도하지 않는다. 운영 watchdog은 관련 없는 장치 장애로 Codex Proxy를 재시작하지 않게 분리해야 한다.
+- watchdog 같은 외부 운영 프로세스가 생성 중 Proxy를 재시작하면 안전하게 `PROVIDER_UNAVAILABLE`로 실패한다. POST를 자동 재전송하면 중복 turn 위험이 있으므로 ThreadFlow는 자동 재시도하지 않는다. Proxy Manager가 여러 enabled Proxy의 readiness를 집계한다면 Codex 외 서비스의 필수 모델·checksum 누락도 전체 재시작을 일으킬 수 있으므로, Manager `/ready`의 개별 실패 이유를 먼저 복구해야 한다.

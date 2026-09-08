@@ -1,6 +1,6 @@
 # Phase 0~9 구현 상태
 
-기준 일시: `2026-09-06 KST`
+기준 일시: `2026-09-08 KST`
 
 ## 결론
 
@@ -61,7 +61,7 @@ Chrome Web Store와 Apple 서명·공증은 공개 배포를 선택할 때만 �
 - 실제 웹 Codex 생성·수정안 버리기/적용·승인·새 작업·검색·복원 PASS. 첫 Provider 오류와 재시도 성공을 구분해 기록했다.
 - 상세: [구현 검토](convenience-theme-review.md). 모바일 키보드·네이티브 Extension/Threads 전달은 여전히 수동 검증 항목이다.
 
-## Proxy 기본 경로·무결성 경계 — 2026-09-07
+## Proxy 기본 경로·무결성 경계 — 2026-09-07, 운영 복구 2026-09-08
 
 - Gateway 기본 Provider를 loopback Codex OAuth Provider Proxy로 전환하고, direct App Server는 명시적 개발 fallback으로 제한했다.
 - `gpt-5.6-sol` + `xhigh` 품질 프로필, 4,000자 메시지 계약 chunking, caller secret `0600`, timeout·취소·오류 마스킹을 적용했다.
@@ -69,6 +69,6 @@ Chrome Web Store와 Apple 서명·공증은 공개 배포를 선택할 때만 �
 - Provider의 완전 출력과 보류한 raw delta가 DLP를 통과한 뒤에만 SSE/UI로 전달된다.
 - 본문·요청·소스·위험·이미지 바이트/Alt Text hash를 묶은 승인 snapshot과 credential-free 수동 전달 pack을 적용했다.
 - 자동 검증 **141/141**, Golden **30/30**, 타입·린트·포맷·웹/Extension build·ZIP·Companion 패키지 PASS.
-- 전용 `threadflow` caller와 `0600` credential을 이 Mac의 Proxy에 등록했고, 격리된 실 Proxy에서 5단계 생성, 후보 3개, 최종 173자, 요청 지문 일치까지 PASS했다.
-- 상시 `4348` Proxy는 연결되지 않은 외부 장치 watchdog이 약 30초마다 모든 Proxy를 재시작하는 운영 문제가 확인됐다. 전역 보호 기능은 사용자 명시 승인 없이 변경하지 않았으며, 해당 watchdog 범위 분리 전까지 기본 daemon의 장시간 생성은 신뢰할 수 없다.
+- 전용 `threadflow` caller와 `0600` credential을 이 Mac의 Proxy에 등록했다. 격리 Proxy 검증에 이어 상시 `4348` Proxy에서 5단계 생성, 후보 3개, 최종 194자, 요청 지문 일치까지 PASS했다.
+- 반복 재시작의 실제 원인은 연결되지 않은 장치가 아니라 Proxy Manager가 집계한 audio Proxy의 `WHISPER_MODEL_SHA256_MISSING`이었다. 설치된 모델의 SHA-256을 launchd 환경에 적용하고 audio Proxy만 재등록했으며, Manager `/ready` 200과 실제 생성 중 PID 유지로 watchdog 안정화를 확인했다.
 - 상세 설정: [Codex OAuth Proxy 설정](codex-oauth-proxy-setup.md), 개발 계획: [구현 계획](../dev-plan/implement_20260907_210320.md).

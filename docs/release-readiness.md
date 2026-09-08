@@ -1,12 +1,12 @@
 # 출시 준비 상태
 
-기준 일시: `2026-09-07 KST`
+기준 일시: `2026-09-08 KST`
 
 ## 개발자 모드 상태
 
 **코드와 설치물은 개인용 localhost 웹·Chrome 개발자 모드 실행 준비 완료다.** 먼저 Proxy caller 환경 변수를 설정하고 `pnpm start:web`으로 자체 웹을 실행할 수 있다. 브라우저 문맥 기능이 필요하면 Web Store 제출과 Apple 서명·공증 없이 `apps/extension/.output/chrome-mv3`를 압축 해제 확장으로 로드하고 `pnpm start:developer -- <extension-id>`를 실행한다.
 
-현재 Mac의 전용 `threadflow` caller와 실 Proxy 격리 스모크는 완료했다. 다만 공용 `4348` daemon은 연결되지 않은 장치 watchdog이 반복 재시작하는 외부 운영 문제가 있어, watchdog 범위가 분리되기 전에는 장시간 생성의 상시 준비 완료로 표시하지 않는다.
+현재 Mac의 전용 `threadflow` caller, 실 Proxy 격리 스모크, 공용 `4348` daemon의 5단계 생성 스모크를 완료했다. audio Proxy 모델 checksum 누락으로 발생하던 Manager readiness 503과 watchdog 반복 재시작도 복구했으며, 전체 Proxy readiness 200과 생성 중 PID 유지까지 확인했다.
 
 ## 자동 검증 완료
 
@@ -30,6 +30,7 @@
 - `pnpm start:developer -- <extension-id>` 개발자 모드 Gateway Health·연결 키 권한 Smoke
 - Codex OAuth Proxy caller 헤더·권한·4,000자 chunk·`gpt-5.6-sol`/`xhigh`·오류 마스킹·DLP Mock 검증
 - 격리된 실 Codex OAuth Proxy의 전용 caller 5단계 생성, 후보 3개, 최종 173자, 요청 지문 일치 Live Smoke
+- 공용 `4348` Proxy의 5단계 생성, 후보 3개, 최종 194자, 요청 지문 일치 및 watchdog 무재시작 Live Smoke
 
 최신 테마·편의 기능의 실제 검증 범위와 미검증 항목은 [구현 검토](convenience-theme-review.md)를 따른다.
 
@@ -43,7 +44,7 @@
 
 ## 공개 배포·실계정 자동 게시 Gate
 
-- [ ] 공용 `4348` Proxy가 관련 없는 장치 watchdog에 의해 재시작되지 않도록 운영 범위 분리
+- [x] 공용 `4348` Proxy Manager readiness 200 및 watchdog 무재시작 확인
 
 - [ ] Meta App 생성·권한 검수
 - [ ] 실제 Threads 계정 OAuth·Text 게시·Insights 조회
